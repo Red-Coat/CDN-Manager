@@ -1,0 +1,9 @@
+apiVersion: cdn.redcoat.dev/v1alpha1
+kind: DistributionClass
+metadata:
+  name: distributionclass-sample
+spec:
+  providers:
+    cloudfront:
+      accessKeyID: AXFF
+

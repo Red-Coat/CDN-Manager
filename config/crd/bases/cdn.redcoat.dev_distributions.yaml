@@ -1,0 +1,216 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: distributions.cdn.redcoat.dev
+spec:
+  group: cdn.redcoat.dev
+  names:
+    kind: Distribution
+    listKind: DistributionList
+    plural: distributions
+    singular: distribution
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Distribution is the Schema for the distributions API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DistributionSpec defines the desired state of Distribution
+            properties:
+              distributionClass:
+                description: Reference to the Distribution Class provider to use for
+                  this distribution
+                properties:
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              hosts:
+                description: The hostnames that this distribution will listen for
+                items:
+                  type: string
+                type: array
+              origin:
+                description: Information about the origin for the distribution
+                properties:
+                  host:
+                    type: string
+                  httpPort:
+                    description: The port this service uses for HTTP requests
+                    properties:
+                      name:
+                        description: The name of the port on the service
+                        type: string
+                      number:
+                        description: The port number on the service
+                        format: int32
+                        type: integer
+                    type: object
+                  httpsPort:
+                    description: The port this service uses for HTTPS requests
+                    properties:
+                      name:
+                        description: The name of the port on the service
+                        type: string
+                      number:
+                        description: The port number on the service
+                        format: int32
+                        type: integer
+                    type: object
+                  targetRef:
+                    properties:
+                      kind:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                type: object
+              rules:
+                description: 'Series of rules for caching behaviors. By default: headers,
+                  methods, query strings, and cookies are not considered when caching,
+                  but this behavior can be changed.'
+                items:
+                  properties:
+                    action:
+                      default: send-to-origin
+                      enum:
+                      - cache-only
+                      - send-to-origin
+                      type: string
+                    items:
+                      items:
+                        type: string
+                      type: array
+                    match:
+                      enum:
+                      - all
+                      - whitelist
+                      - blacklist
+                      type: string
+                    type:
+                      enum:
+                      - headers
+                      - query-strings
+                      - cookies
+                      type: string
+                  required:
+                  - action
+                  - match
+                  - type
+                  type: object
+                type: array
+              supportedMethods:
+                items:
+                  type: string
+                type: array
+              tls:
+                description: Optionally you can support TLS on your distribution
+                properties:
+                  dedicatedIP:
+                    default: false
+                    description: Set this true if you need to request a dedicated
+                      IP address for your distribution in order to support legacy
+                      (non-SNI) clients. Warning, this may incurr high costs from
+                      many providers!
+                    type: boolean
+                  mode:
+                    default: redirect
+                    description: 'Sets how TLS is handled by the distribution: Redirect
+                      (default) causes HTTP requests to be redirected to HTTPS Only
+                      causes HTTP requests to be dropped Both causes both HTTP and
+                      HTTPs requests to be respected'
+                    enum:
+                    - redirect
+                    - only
+                    - both
+                    type: string
+                  secretName:
+                    description: The name of the secret containing the tls certificate
+                    type: string
+                required:
+                - dedicatedIP
+                - mode
+                - secretName
+                type: object
+            required:
+            - distributionClass
+            - hosts
+            - origin
+            - rules
+            - supportedMethods
+            type: object
+          status:
+            description: DistributionStatus defines the observed state of Distribution
+            properties:
+              cloudfront:
+                properties:
+                  id:
+                    type: string
+                  state:
+                    enum:
+                    - Deployed
+                    - Deploying
+                    - Deleting
+                    - InProgress
+                    type: string
+                required:
+                - id
+                - state
+                type: object
+              endpoints:
+                items:
+                  properties:
+                    host:
+                      type: string
+                    ip:
+                      type: string
+                    provider:
+                      type: string
+                  required:
+                  - provider
+                  type: object
+                type: array
+              ready:
+                type: boolean
+            required:
+            - ready
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

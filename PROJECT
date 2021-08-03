@@ -1,0 +1,25 @@
+domain: redcoat.dev
+layout:
+- go.kubebuilder.io/v3
+projectName: cdn
+repo: redcoat.dev/cdn
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: false
+  domain: redcoat.dev
+  group: cdn
+  kind: DistributionClass
+  path: redcoat.dev/cdn/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redcoat.dev
+  group: cdn
+  kind: Distribution
+  path: redcoat.dev/cdn/api/v1alpha1
+  version: v1alpha1
+version: "3"

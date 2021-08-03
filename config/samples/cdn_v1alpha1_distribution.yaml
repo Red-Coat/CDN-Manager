@@ -1,0 +1,20 @@
+apiVersion: cdn.redcoat.dev/v1alpha1
+kind: Distribution
+metadata:
+  name: distribution-sample
+spec:
+  hosts: []
+  origin:
+    host: nb-185-3-93-151.london.nodebalancer.linode.com
+    httpPort:
+      number: 80
+    httpsPort:
+      number: 443
+  supportedMethods:
+    - HEAD
+    - GET
+    - OPTIONS
+  distributionClass:
+    kind: DistibutionClass
+    name: distributionclass-sample
+  rules: []
