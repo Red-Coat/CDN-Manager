@@ -15,6 +15,5 @@ spec:
     - GET
     - OPTIONS
   distributionClass:
-    kind: DistibutionClass
+    kind: DistributionClass
     name: distributionclass-sample
-  rules: []

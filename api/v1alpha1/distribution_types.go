@@ -21,8 +21,12 @@ import (
 )
 
 type ObjectReference struct {
+	// The kind of resource to target (Ingress or Service)
+	// +kubebuilder:validation=Ingress;Service
 	Kind string `json:"kind"`
 
+	// The name of the resource to target. This must be in the same
+	// namespace as the Distribution resource.
 	Name string `json:"name"`
 }
 
@@ -45,21 +49,6 @@ type TLSSpec struct {
 	DedicatedIP bool `json:"dedicatedIP"`
 }
 
-type CacheBehavior struct {
-	// +kubebuilder:validation:Enum=headers;query-strings;cookies
-	Type string `json:"type"`
-
-	// +kubebuilder:validation:Enum=cache-only;send-to-origin
-	// +kubebuilder:default=send-to-origin
-	Action string `json:"action"`
-
-	// +kubebuilder:validation:Enum=all;whitelist;blacklist
-	Match string `json:"match"`
-
-	// +optional
-	Items []string `json:"items,omitempty"`
-}
-
 // Used to represent a port on a service. Either name or number must be
 // specified
 type ServicePort struct {
@@ -73,6 +62,9 @@ type ServicePort struct {
 }
 
 type Origin struct {
+	// If you want to target another Resource in the cluster (eg a Service
+	// or an Ingress) specify it here. The Distribution will point to that
+	// service's ingress load balancer.
 	// +optional
 	Target *ObjectReference `json:"targetRef"`
 
@@ -88,18 +80,22 @@ type Origin struct {
 	HTTPSPort *ServicePort `json:"httpsPort"`
 }
 
-// DistributionSpec defines the desired state of Distribution
+// The desired state of the Distribution
 type DistributionSpec struct {
 	// Reference to the Distribution Class provider to use for this
 	// distribution
 	DistributionClassRef ObjectReference `json:"distributionClass"`
 
+	// The list of HTTP methods to support. Others will be rejected with
+	// the CDN provider's native behaviour. NB: the controller can only
+	// guarantee that methods will work if they are "standard", eg
+	// CloudFront only supports HEAD, GET, OPTIONS, POST, PUT, DELETE.
+	//
+	// In addition, the controller cannot guarantee that methods you don't
+	// specify here _won't_ be accessible. For example, CloudFront only
+	// supports limited subsets, so if you specify any one of POST, PUT,
+	// or DELETE, all methods are enabled.
 	SupportedMethods []string `json:"supportedMethods"`
-
-	// Series of rules for caching behaviors. By default: headers,
-	// methods, query strings, and cookies are not considered when
-	// caching, but this behavior can be changed.
-	Rules []CacheBehavior `json:"rules"`
 
 	// Information about the origin for the distribution
 	Origin Origin `json:"origin"`
@@ -112,26 +108,59 @@ type DistributionSpec struct {
 	TLS *TLSSpec `json:"tls"`
 }
 
+// The status of a CloudFront Distribution, if one was requested by the
+// DistributionClass
 type CloudFrontStatus struct {
+	// The CloudFront State as reported by the AWS API. NB: "InProgress"
+	// does not always mean the distribution is not yet available as
+	// sometimes this occurs when minor items are being updated.
 	//+kubebuilder:validation:Enum=Deployed;Disabled;InProgress
 	State string `json:"state"`
-	ID    string `json:"id"`
+
+	// The ID of the CloudFront Distribution (you can use this in any
+	// interaction with the aws cloudfront api).
+	ID string `json:"id"`
 }
 
+// Information about a specific Endpoint
+//
+// This must always contain a Provider identifier, as all endpoints are
+// associated with one. It can then have a hostname, IP address, or
+// both. If it has both, these should be the same resource, eg:
+//
+// Acceptable:
+// - ip: 1.2.3.4
+//   host: lb-1-2-3-4.provider.example.com
+//
+// Not Acceptable:
+// - ip: 1.2.3.4
+//   host: lb-4-5-6-7.provider.example.com
+//
+// If there are two distinct endpoints, one with an ip and one with
+// host, just specify these as seperate Endpoint items:
+// - ip: 1.2.3.4
+// - host: lb-4-5-6-7.provider.example.com
 type Endpoint struct {
+	// The name of the provider that is responsible for this endpoint
+	// (eg "cloudfront")
 	Provider string `json:"provider"`
 
+	// A hostname that the distribution is available at
 	// +optional
 	Host string `json:"host,omitempty"`
 
+	// An IP address that the distribution is available at
 	// +optional
 	IP string `json:"ip,omitempty"`
 }
 
-// DistributionStatus defines the observed state of Distribution
+// The current State of the Distribution
 type DistributionStatus struct {
 	Ready bool `json:"ready"`
 
+	// List of one or more "endpoints" for the deployed distribution.
+	// These can be either hostnames for DNS CNAMING, or direct IP
+	// addresses, depending on the provider.
 	//+optional
 	Endpoints []Endpoint `json:"endpoints"`
 

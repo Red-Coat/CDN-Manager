@@ -40,19 +40,22 @@ type CloudFrontSpec struct {
 	SecretAccessKey *cmmeta.SecretKeySelector `json:"secretAccessKeySecretRef"`
 }
 
-// List of providers to setup edge caches with
 type ProviderList struct {
+	// Deploy Distributions to AWS CloudFront
 	// +optional
 	CloudFront *CloudFrontSpec `json:"cloudfront,omitempty"`
 }
 
-// Defines how this edge cache will work
+// Desired state of the DistributionClass Resource
 type DistributionClassSpec struct {
+	// List of one or more providers to deploy Distributions to. At least
+	// one must be provided
 	Providers ProviderList `json:"providers"`
 }
 
-// DistributionClassStatus defines the observed state of DistributionClass
+// The current state of the DistributionClass Resource
 type DistributionClassStatus struct {
+	// Currently unused, this exists for possible future usage
 	Ready bool `json:"ready"`
 }
 

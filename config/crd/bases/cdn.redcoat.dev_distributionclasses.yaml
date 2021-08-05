@@ -34,15 +34,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: Defines how this edge cache will work
+            description: Desired state of the DistributionClass Resource
             properties:
               providers:
-                description: List of providers to setup edge caches with
+                description: List of one or more providers to deploy Distributions
+                  to. At least one must be provided
                 properties:
                   cloudfront:
-                    description: The access details for cloudfront distributions If
-                      this section is provided, a cloudfront distribution will be
-                      setup, even if access details are not given in this block.
+                    description: Deploy Distributions to AWS CloudFront
                     properties:
                       accessKeyID:
                         description: 'The AccessKeyID is used for authentication.
@@ -72,9 +71,10 @@ spec:
             - providers
             type: object
           status:
-            description: DistributionClassStatus defines the observed state of DistributionClass
+            description: The current state of the DistributionClass Resource
             properties:
               ready:
+                description: Currently unused, this exists for possible future usage
                 type: boolean
             required:
             - ready
