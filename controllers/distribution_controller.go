@@ -49,13 +49,24 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log := log.FromContext(ctx)
 
 	var distro cdnv1alpha1.Distribution
-	var class cdnv1alpha1.DistributionClass
+	var class cdnv1alpha1.DistributionClassSpec
 
 	r.Get(ctx, req.NamespacedName, &distro)
-	r.Get(ctx, client.ObjectKey{
-		Namespace: distro.Namespace,
-		Name:      distro.Spec.DistributionClassRef.Name,
-	}, &class)
+
+	if distro.Spec.DistributionClassRef.Kind == "ClusterDistributionClass" {
+		var parent cdnv1alpha1.ClusterDistributionClass
+		r.Get(ctx, client.ObjectKey{
+			Name: distro.Spec.DistributionClassRef.Name,
+		}, &parent)
+		class = parent.Spec
+	} else {
+		var parent cdnv1alpha1.DistributionClass
+		r.Get(ctx, client.ObjectKey{
+			Namespace: distro.Namespace,
+			Name:      distro.Spec.DistributionClassRef.Name,
+		}, &parent)
+		class = parent.Spec
+	}
 
 	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 
@@ -64,7 +75,7 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if class.Spec.Providers.CloudFront == nil {
+	if class.Providers.CloudFront == nil {
 		log.Info("CloudFront not requested. Ignoring Resource")
 		// TODO Check status and cleanup distro if needed
 
@@ -112,13 +123,18 @@ func (r *DistributionReconciler) Watch(
 	kind client.Object,
 	cacheKey string,
 	cache func(*cdnv1alpha1.Distribution) string,
+	namespaced bool,
 ) {
 	mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&cdnv1alpha1.Distribution{},
 		cacheKey,
 		func(object client.Object) []string {
-			return []string{cache(object.(*cdnv1alpha1.Distribution))}
+			if key := cache(object.(*cdnv1alpha1.Distribution)); key != "" {
+				return []string{key}
+			} else {
+				return []string{}
+			}
 		},
 	)
 
@@ -129,11 +145,15 @@ func (r *DistributionReconciler) Watch(
 				ctx := context.Background()
 
 				var distroList cdnv1alpha1.DistributionList
+				predicate := client.MatchingFields{cacheKey: object.GetName()}
 
-				r.List(ctx, &distroList,
-					client.InNamespace(object.GetNamespace()),
-					client.MatchingFields{cacheKey: object.GetName()},
-				)
+				if namespaced {
+					r.List(ctx, &distroList, predicate,
+						client.InNamespace(object.GetNamespace()),
+					)
+				} else {
+					r.List(ctx, &distroList, predicate)
+				}
 
 				requests := make([]ctrl.Request, len(distroList.Items))
 				for i, distro := range distroList.Items {
@@ -148,6 +168,16 @@ func (r *DistributionReconciler) Watch(
 	)
 }
 
+func DistributionClassRefChecker(Kind string) func(*cdnv1alpha1.Distribution) string {
+	return func(distro *cdnv1alpha1.Distribution) string {
+		if distro.Spec.DistributionClassRef.Kind == Kind {
+			return distro.Spec.DistributionClassRef.Name
+		} else {
+			return ""
+		}
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).For(&cdnv1alpha1.Distribution{})
@@ -157,9 +187,16 @@ func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		mgr,
 		&cdnv1alpha1.DistributionClass{},
 		"distributionClass",
-		func(distro *cdnv1alpha1.Distribution) string {
-			return distro.Spec.DistributionClassRef.Name
-		},
+		DistributionClassRefChecker("DistributionClass"),
+		true,
+	)
+	r.Watch(
+		builder,
+		mgr,
+		&cdnv1alpha1.ClusterDistributionClass{},
+		"clusterDistributionClass",
+		DistributionClassRefChecker("ClusterDistributionClass"),
+		false,
 	)
 
 	return builder.Complete(r)

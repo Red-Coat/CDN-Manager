@@ -1,0 +1,7 @@
+apiVersion: cdn.redcoat.dev/v1alpha1
+kind: ClusterDistributionClass
+metadata:
+  name: clusterdistributionclass-sample
+spec:
+  # Add fields here
+  foo: bar

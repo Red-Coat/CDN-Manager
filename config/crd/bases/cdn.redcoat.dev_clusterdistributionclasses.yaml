@@ -6,21 +6,22 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: distributionclasses.cdn.redcoat.dev
+  name: clusterdistributionclasses.cdn.redcoat.dev
 spec:
   group: cdn.redcoat.dev
   names:
-    kind: DistributionClass
-    listKind: DistributionClassList
-    plural: distributionclasses
-    singular: distributionclass
-  scope: Namespaced
+    kind: ClusterDistributionClass
+    listKind: ClusterDistributionClassList
+    plural: clusterdistributionclasses
+    singular: clusterdistributionclass
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Represents a type of distribution scheme, to one or more cdn
-          providers.
+          providers. This resource is cluster wide, so can be referenced by distributions
+          in any namespace.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

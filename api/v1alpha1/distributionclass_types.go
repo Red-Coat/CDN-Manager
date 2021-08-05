@@ -62,7 +62,8 @@ type DistributionClassStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// DistributionClass is the Schema for the distributionclasses API
+// Represents a type of distribution scheme, to one or more cdn
+// providers.
 type DistributionClass struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -80,6 +81,31 @@ type DistributionClassList struct {
 	Items           []DistributionClass `json:"items"`
 }
 
+//+kubebuilder:object:root=true
+//+kubebuilder:resource:scope=Cluster
+//+kubebuilder:subresource:status
+
+// Represents a type of distribution scheme, to one or more cdn
+// providers. This resource is cluster wide, so can be referenced by
+// distributions in any namespace.
+type ClusterDistributionClass struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   DistributionClassSpec   `json:"spec,omitempty"`
+	Status DistributionClassStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// ClusterDistributionClassList contains a list of ClusterDistributionClass
+type ClusterDistributionClassList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterDistributionClass `json:"items"`
+}
+
 func init() {
 	SchemeBuilder.Register(&DistributionClass{}, &DistributionClassList{})
+	SchemeBuilder.Register(&ClusterDistributionClass{}, &ClusterDistributionClassList{})
 }
