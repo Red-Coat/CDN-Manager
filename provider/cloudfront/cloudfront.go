@@ -29,13 +29,15 @@ import (
 )
 
 type Provider struct {
-	client         *cloudfront.CloudFront
-	distribution   *api.Distribution
+	Client         *cloudfront.CloudFront
+	Distribution   *api.Distribution
 	Origin         kubernetes.ResolvedOrigin
 	PreviousStatus *api.CloudFrontStatus
 	Endpoints      []api.Endpoint
 }
 
+// Creates a new CloudFront Provider from the given Distribution and
+// calculated ResolvedOrigin
 func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigin) (*Provider, error) {
 	config := aws.NewConfig()
 	sessionOpts := session.Options{
@@ -45,39 +47,49 @@ func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigi
 	client := cloudfront.New(sess)
 
 	return &Provider{
-		client:         client,
-		distribution:   distribution,
+		Client:         client,
+		Distribution:   distribution,
 		Origin:         origin,
 		PreviousStatus: distribution.Status.CloudFront,
 	}, nil
 }
 
+// Returns the current CloudFront status
 func (c *Provider) GetStatus() *api.CloudFrontStatus {
-	return c.distribution.Status.CloudFront
+	return c.Distribution.Status.CloudFront
 }
 
+// Calculates the Allowed and Cached methods for the CloudFront
+// Distribution
+//
+// The k8s Distribution tries to be relatively generic in the way it is
+// defined, so you can specify any list of supported HTTP Methods,
+// however CloudFront only supports limited subsets:
+// - HEAD and GET only
+// - HEAD, GET and OPTIONS
+// - HEAD, GET, OPTIONS, POST, PUT, and DELETE
+//
+// HEAD and GET requests are always cached. POST, PUT, and DELETE are
+// never cached. OPTIONS can optionally be cached (this method will
+// always cache OPTIONS, if it is set)
 func (c *Provider) CalculateMethods() ([]string, []string) {
 	methods := []string{"HEAD", "GET"}
-	cached := []string{"HEAD", "GET"}
-	for _, header := range c.distribution.Spec.SupportedMethods {
+	for _, header := range c.Distribution.Spec.SupportedMethods {
 		if header == "OPTIONS" {
 			methods = append(methods, "OPTIONS")
-			cached = append(cached, "OPTIONS")
 		} else if header == "POST" || header == "PUT" || header == "DELETE" {
-			if len(methods) == 2 {
-				methods = append(methods, "OPTIONS")
-				cached = append(cached, "OPTIONS")
-			}
-			methods = append(methods, "POST", "PUT", "DELETE")
-			break
+			return []string{"HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"},
+				[]string{"HEAD", "GET", "OPTIONS"}
 		}
 	}
 
-	return methods, cached
+	return methods, methods
 }
 
+// Calculates the CloudFront TLS ViewerPolicy from the Distribution's
+// TLS Settings
 func (c *Provider) CalculateViewerPolicy() string {
-	tls := c.distribution.Spec.TLS
+	tls := c.Distribution.Spec.TLS
 	if tls == nil || tls.Mode == "both" {
 		return cloudfront.ViewerProtocolPolicyAllowAll
 	}
@@ -89,11 +101,16 @@ func (c *Provider) CalculateViewerPolicy() string {
 	return cloudfront.ViewerProtocolPolicyRedirectToHttps
 }
 
+// Calculates the full desired state of the CloudFront Distribution
+//
+// This is used to create new Distributions, to compare against existing
+// Distributions, and to update Distributions if their state does not
+// match.
 func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 	supportedMethods, cachedMethods := c.CalculateMethods()
 
 	return &cloudfront.DistributionConfig{
-		CallerReference: aws.String(string(c.distribution.UID)),
+		CallerReference: aws.String(string(c.Distribution.UID)),
 		Comment:         aws.String("Managed By cdn.redcoat.dev"),
 		Enabled:         aws.Bool(true),
 		IsIPV6Enabled:   aws.Bool(true),
@@ -128,8 +145,8 @@ func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 			Quantity: aws.Int64(0),
 		},
 		Aliases: &cloudfront.Aliases{
-			Quantity: aws.Int64(int64(len(c.distribution.Spec.Hosts))),
-			//Items:    aws.StringSlice(c.distribution.Spec.Hosts),
+			Quantity: aws.Int64(int64(len(c.Distribution.Spec.Hosts))),
+			//Items:    aws.StringSlice(c.Distribution.Spec.Hosts),
 		},
 		CacheBehaviors: &cloudfront.CacheBehaviors{
 			Quantity: aws.Int64(0),
@@ -183,8 +200,9 @@ func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 	}
 }
 
+// Sets the Status based on the Status returned by the AWS API
 func (c *Provider) SetStatus(Distribution *cloudfront.Distribution) {
-	c.distribution.Status.CloudFront = &api.CloudFrontStatus{
+	c.Distribution.Status.CloudFront = &api.CloudFrontStatus{
 		State: *Distribution.Status,
 		ID:    *Distribution.Id,
 	}
@@ -194,10 +212,12 @@ func (c *Provider) SetStatus(Distribution *cloudfront.Distribution) {
 	}}
 }
 
+// Checks an existing Distribution's state matches with what is expected
+// and updates it if not
 func (c *Provider) Check() error {
 	id := &c.GetStatus().ID
 
-	current, err := c.client.GetDistribution(&cloudfront.GetDistributionInput{
+	current, err := c.Client.GetDistribution(&cloudfront.GetDistributionInput{
 		Id: id,
 	})
 	c.SetStatus(current.Distribution)
@@ -220,7 +240,7 @@ func (c *Provider) Check() error {
 		return nil
 	}
 
-	updated, err := c.client.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+	updated, err := c.Client.UpdateDistribution(&cloudfront.UpdateDistributionInput{
 		DistributionConfig: desired,
 		Id:                 id,
 		IfMatch:            current.ETag,
@@ -235,24 +255,34 @@ func (c *Provider) Check() error {
 	return nil
 }
 
+// Creates a CloudFront Distribution and sets its status on the
+// Distribution resource
+//
+// This is called in one of two circumstances:
+// - The Distribution Controller does not find any CloudFront state on
+//   the Distribution.
+// - The Distribution Controller has found CloudFront state, but when
+//   Check() was running, AWS returned a Not Found on it (implying the
+//   Distribution has been destroyed).
 func (c *Provider) Create() error {
-	info, err := c.client.CreateDistribution(&cloudfront.CreateDistributionInput{
+	info, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: c.GenerateDistributionConfig(),
 	})
 
-	if err != nil {
-		return err
-	}
-
 	c.SetStatus(info.Distribution)
 
-	return nil
+	return err
 }
 
 func (c *Provider) Delete() {
 	//
 }
 
+// Checks if the Status has been changed in this run
+//
+// This is used by the Distribution Controller to determine if it should
+// regenerate the Distribution's status and save this back to the
+// api-server.
 func (c *Provider) IsDirty() bool {
 	status := c.GetStatus()
 
@@ -265,10 +295,20 @@ func (c *Provider) IsDirty() bool {
 	return status.ID != c.PreviousStatus.ID || status.State != c.PreviousStatus.State
 }
 
+// Informs the Distribution Controller if this resource needs a recheck
+//
+// When a CloudFront Distribution is InProgress, we need to recheck it
+// sooner than controller-runtime's usual refresh time, to check up on
+// its update progress and, hopefully, update the Status to Deployed.
 func (c *Provider) NeedsRecheck() bool {
 	return c.GetStatus().State != "Deployed"
 }
 
+// Checks if the CloudFront Distribution is ready
+//
+// This is used by the Distribution Controller to set the Distribution's
+// overall "Ready" status field. If any Provider returns false, that
+// field will be false.
 func (c *Provider) IsReady() bool {
 	return c.GetStatus().State == "Deployed"
 }
