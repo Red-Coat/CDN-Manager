@@ -183,14 +183,6 @@ func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 	}
 }
 
-func (c *Provider) CalculateStatus(status string) string {
-	if status == "Deployed" {
-		return "Redeployed"
-	} else {
-		return ""
-	}
-}
-
 func (c *Provider) SetStatus(Distribution *cloudfront.Distribution) {
 	c.distribution.Status.CloudFront = &api.CloudFrontStatus{
 		State: *Distribution.Status,

@@ -113,7 +113,7 @@ type DistributionSpec struct {
 }
 
 type CloudFrontStatus struct {
-	//+kubebuilder:validation:Enum=Deployed;Deploying;Deleting;InProgress
+	//+kubebuilder:validation:Enum=Deployed;Disabled;InProgress
 	State string `json:"state"`
 	ID    string `json:"id"`
 }
