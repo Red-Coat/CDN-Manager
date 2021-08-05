@@ -32,34 +32,51 @@ type OriginResolver struct {
 	Namespace string
 }
 
+// Represents the system's "resolved" origin details
+//
+// Distributions can point to Ingresses, Services, or custom hosts, on
+// any ports you specify. When it comes to the providers performing
+// their tasks, they need to know the actual hostname / port
+// configurations to give to their CDN APIs.
 type ResolvedOrigin struct {
 	Host      string
 	HTTPPort  int32
 	HTTPSPort int32
 }
 
+// Checks to see if the Origin is "complete" (ie, has all values filled
+// in)
+func (r *ResolvedOrigin) IsComplete() bool {
+	return r.Host != "" && r.HTTPPort != 0 && r.HTTPSPort != 0
+}
+
+// Checks to see if a custom hostname has been specified - if it has,
+// this takes precedence and is immediately set
 func (r *OriginResolver) ResolveCustomHost() {
 	if r.Origin.Host != "" {
 		r.Resolved.Host = r.Origin.Host
 	}
 }
 
+// Checks to see if a port number has been given for the given port - if
+// it has, this takes precedence and is immediately set
 func ResolveCustomPort(port *api.ServicePort, dest *int32) {
 	if port != nil && port.Number != 0 {
 		*dest = port.Number
 	}
 }
 
-func (r *OriginResolver) IsComplete() bool {
-	return r.Resolved.Host != "" && r.Resolved.HTTPPort != 0 && r.Resolved.HTTPSPort != 0
-}
-
+// Checks to see if the given named Service Port matches a the name of a
+// port on the Distribution - if it does we'll use its value
 func SetPort(port corev1.ServicePort, portSpec *api.ServicePort, dest *int32) {
 	if portSpec != nil && port.Name == portSpec.Name {
 		*dest = port.Port
 	}
 }
 
+// Loads a resource (either Ingress or Service) by looking for the
+// resource by the name given in the Distribution resource, and in the
+// same namespace
 func (r *OriginResolver) LoadResource(obj client.Object) {
 	r.Get(context.TODO(), client.ObjectKey{
 		Namespace: r.Namespace,
@@ -67,16 +84,14 @@ func (r *OriginResolver) LoadResource(obj client.Object) {
 	}, obj)
 }
 
-func (r *OriginResolver) ResolveLoadBalancer(ingress []corev1.LoadBalancerIngress) error {
+// Checks to see if a LoadBalancerIngress[] resource has any values and
+// uses this as the origin hostname if it does
+func (r *OriginResolver) ResolveLoadBalancer(ingress []corev1.LoadBalancerIngress) {
 	// If the Host is already set, it must have been via the custom field,
 	// which is the first thing that is checked. This field takes
 	// precedence over autodiscovered ones so we can skip this check here.
-	if r.Resolved.Host != "" {
-		return nil
-	}
-
-	if len(ingress) == 0 {
-		return fmt.Errorf("There is no load balancer ingress on the service")
+	if r.Resolved.Host != "" || len(ingress) == 0 {
+		return
 	}
 
 	// We currently only support one origin field
@@ -86,33 +101,37 @@ func (r *OriginResolver) ResolveLoadBalancer(ingress []corev1.LoadBalancerIngres
 	} else {
 		r.Resolved.Host = firstHost.IP
 	}
-
-	return nil
 }
 
-func (r *OriginResolver) ResolveService() error {
+// Loads a Service Resource and tries to infer origin details from it
+//
+// If the Service has a status.loadBalancer.ingress[0].hostname/ip, this
+// will be used as the origin.
+// The service's named ports will be checked against the named ports on
+// the Distribution
+func (r *OriginResolver) ResolveService() {
 	var svc corev1.Service
 	r.LoadResource(&svc)
 
-	if err := r.ResolveLoadBalancer(svc.Status.LoadBalancer.Ingress); err != nil {
-		return err
-	}
+	r.ResolveLoadBalancer(svc.Status.LoadBalancer.Ingress)
 
 	for _, port := range svc.Spec.Ports {
 		SetPort(port, r.Origin.HTTPPort, &r.Resolved.HTTPPort)
 		SetPort(port, r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
 	}
-
-	return nil
 }
 
-func (r *OriginResolver) ResolveIngress() error {
+// Loads an Ingress Resoruce and tries to infer origin hostname from its
+// loadbalancer, if it is set
+func (r *OriginResolver) ResolveIngress() {
 	var ing networking.Ingress
 	r.LoadResource(&ing)
 
-	return r.ResolveLoadBalancer(ing.Status.LoadBalancer.Ingress)
+	r.ResolveLoadBalancer(ing.Status.LoadBalancer.Ingress)
 }
 
+// Inspects a Distribution and tries to resolve its origin details from
+// it
 func (r *OriginResolver) Resolve(distro api.Distribution) (*ResolvedOrigin, error) {
 	r.Origin = distro.Spec.Origin
 	r.Resolved = &ResolvedOrigin{}
@@ -121,24 +140,19 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (*ResolvedOrigin, erro
 	ResolveCustomPort(r.Origin.HTTPPort, &r.Resolved.HTTPPort)
 	ResolveCustomPort(r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
 
-	if r.IsComplete() {
+	if r.Resolved.IsComplete() {
 		return r.Resolved, nil
 	}
 
 	if r.Origin.Target != nil {
-		var err error
 		if r.Origin.Target.Kind == "Service" {
-			err = r.ResolveService()
+			r.ResolveService()
 		} else {
-			err = r.ResolveIngress()
-		}
-
-		if err != nil {
-			return nil, err
+			r.ResolveIngress()
 		}
 	}
 
-	if !r.IsComplete() {
+	if !r.Resolved.IsComplete() {
 		return r.Resolved, fmt.Errorf("Not all information was provided")
 	}
 
