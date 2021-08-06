@@ -1,4 +1,4 @@
-module redcoat.dev/cdn
+module git.redcoat.dev/cdn
 
 go 1.16
 

@@ -1,0 +1,62 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - cdn.redcoat.dev
+  resources:
+  - clusterdistributionclasses
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - cdn.redcoat.dev
+  resources:
+  - distributionclasses
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - cdn.redcoat.dev
+  resources:
+  - distributions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cdn.redcoat.dev
+  resources:
+  - distributions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cdn.redcoat.dev
+  resources:
+  - distributions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - networking
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - v1
+  resources:
+  - services
+  verbs:
+  - get
+  - watch
