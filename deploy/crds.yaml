@@ -1,0 +1,413 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: clusterdistributionclasses.cdn.redcoat.dev
+spec:
+  group: cdn.redcoat.dev
+  names:
+    kind: ClusterDistributionClass
+    listKind: ClusterDistributionClassList
+    plural: clusterdistributionclasses
+    singular: clusterdistributionclass
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Represents a type of distribution scheme, to one or more cdn
+          providers. This resource is cluster wide, so can be referenced by distributions
+          in any namespace.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Desired state of the DistributionClass Resource
+            properties:
+              providers:
+                description: List of one or more providers to deploy Distributions
+                  to. At least one must be provided
+                properties:
+                  cloudfront:
+                    description: The access details for cloudfront distributions If
+                      this section is provided, a cloudfront distribution will be
+                      setup, even if access details are not given in this block.
+                    properties:
+                      accessKeyID:
+                        description: 'The AccessKeyID is used for authentication.
+                          If not set we fall-back to using env vars, shared credentials
+                          file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
+                        type: string
+                      secretAccessKeySecretRef:
+                        description: The SecretAccessKey is used for authentication.
+                          If not set we fall-back to using env vars, shared credentials
+                          file or AWS Instance metadata https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
+                        properties:
+                          key:
+                            description: The key of the entry in the Secret resource's
+                              `data` field to be used. Some instances of this field
+                              may be defaulted, in others it may be required.
+                            type: string
+                          name:
+                            description: 'Name of the resource being referred to.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    type: object
+                type: object
+            required:
+            - providers
+            type: object
+          status:
+            description: The current state of the DistributionClass Resource
+            properties:
+              ready:
+                description: Currently unused, this exists for possible future usage
+                type: boolean
+            required:
+            - ready
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: distributionclasses.cdn.redcoat.dev
+spec:
+  group: cdn.redcoat.dev
+  names:
+    kind: DistributionClass
+    listKind: DistributionClassList
+    plural: distributionclasses
+    singular: distributionclass
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Represents a type of distribution scheme, to one or more cdn
+          providers.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Desired state of the DistributionClass Resource
+            properties:
+              providers:
+                description: List of one or more providers to deploy Distributions
+                  to. At least one must be provided
+                properties:
+                  cloudfront:
+                    description: The access details for cloudfront distributions If
+                      this section is provided, a cloudfront distribution will be
+                      setup, even if access details are not given in this block.
+                    properties:
+                      accessKeyID:
+                        description: 'The AccessKeyID is used for authentication.
+                          If not set we fall-back to using env vars, shared credentials
+                          file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
+                        type: string
+                      secretAccessKeySecretRef:
+                        description: The SecretAccessKey is used for authentication.
+                          If not set we fall-back to using env vars, shared credentials
+                          file or AWS Instance metadata https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
+                        properties:
+                          key:
+                            description: The key of the entry in the Secret resource's
+                              `data` field to be used. Some instances of this field
+                              may be defaulted, in others it may be required.
+                            type: string
+                          name:
+                            description: 'Name of the resource being referred to.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    type: object
+                type: object
+            required:
+            - providers
+            type: object
+          status:
+            description: The current state of the DistributionClass Resource
+            properties:
+              ready:
+                description: Currently unused, this exists for possible future usage
+                type: boolean
+            required:
+            - ready
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: distributions.cdn.redcoat.dev
+spec:
+  group: cdn.redcoat.dev
+  names:
+    kind: Distribution
+    listKind: DistributionList
+    plural: distributions
+    singular: distribution
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Distribution is the Schema for the distributions API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: The desired state of the Distribution
+            properties:
+              distributionClass:
+                description: Reference to the Distribution Class provider to use for
+                  this distribution
+                properties:
+                  kind:
+                    description: The kind of resource to target (Ingress or Service)
+                    type: string
+                  name:
+                    description: The name of the resource to target. This must be
+                      in the same namespace as the Distribution resource.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              hosts:
+                description: The hostnames that this distribution will listen for
+                items:
+                  type: string
+                type: array
+              origin:
+                description: Information about the origin for the distribution
+                properties:
+                  host:
+                    type: string
+                  httpPort:
+                    description: The port this service uses for HTTP requests
+                    properties:
+                      name:
+                        description: The name of the port on the service
+                        type: string
+                      number:
+                        description: The port number on the service
+                        format: int32
+                        type: integer
+                    type: object
+                  httpsPort:
+                    description: The port this service uses for HTTPS requests
+                    properties:
+                      name:
+                        description: The name of the port on the service
+                        type: string
+                      number:
+                        description: The port number on the service
+                        format: int32
+                        type: integer
+                    type: object
+                  targetRef:
+                    description: If you want to target another Resource in the cluster
+                      (eg a Service or an Ingress) specify it here. The Distribution
+                      will point to that service's ingress load balancer.
+                    properties:
+                      kind:
+                        description: The kind of resource to target (Ingress or Service)
+                        type: string
+                      name:
+                        description: The name of the resource to target. This must
+                          be in the same namespace as the Distribution resource.
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                type: object
+              supportedMethods:
+                description: "The list of HTTP methods to support. Others will be
+                  rejected with the CDN provider's native behaviour. NB: the controller
+                  can only guarantee that methods will work if they are \"standard\",
+                  eg CloudFront only supports HEAD, GET, OPTIONS, POST, PUT, DELETE.
+                  \n In addition, the controller cannot guarantee that methods you
+                  don't specify here _won't_ be accessible. For example, CloudFront
+                  only supports limited subsets, so if you specify any one of POST,
+                  PUT, or DELETE, all methods are enabled."
+                items:
+                  type: string
+                type: array
+              tls:
+                description: Optionally you can support TLS on your distribution
+                properties:
+                  dedicatedIP:
+                    default: false
+                    description: Set this true if you need to request a dedicated
+                      IP address for your distribution in order to support legacy
+                      (non-SNI) clients. Warning, this may incurr high costs from
+                      many providers!
+                    type: boolean
+                  mode:
+                    default: redirect
+                    description: 'Sets how TLS is handled by the distribution: Redirect
+                      (default) causes HTTP requests to be redirected to HTTPS Only
+                      causes HTTP requests to be dropped Both causes both HTTP and
+                      HTTPs requests to be respected'
+                    enum:
+                    - redirect
+                    - only
+                    - both
+                    type: string
+                  secretName:
+                    description: The name of the secret containing the tls certificate
+                    type: string
+                required:
+                - dedicatedIP
+                - mode
+                - secretName
+                type: object
+            required:
+            - distributionClass
+            - hosts
+            - origin
+            - supportedMethods
+            type: object
+          status:
+            description: The current State of the Distribution
+            properties:
+              cloudfront:
+                description: The status of a CloudFront Distribution, if one was requested
+                  by the DistributionClass
+                properties:
+                  id:
+                    description: The ID of the CloudFront Distribution (you can use
+                      this in any interaction with the aws cloudfront api).
+                    type: string
+                  state:
+                    description: 'The CloudFront State as reported by the AWS API.
+                      NB: "InProgress" does not always mean the distribution is not
+                      yet available as sometimes this occurs when minor items are
+                      being updated.'
+                    enum:
+                    - Deployed
+                    - Disabled
+                    - InProgress
+                    type: string
+                required:
+                - id
+                - state
+                type: object
+              endpoints:
+                description: List of one or more "endpoints" for the deployed distribution.
+                  These can be either hostnames for DNS CNAMING, or direct IP addresses,
+                  depending on the provider.
+                items:
+                  description: "Information about a specific Endpoint \n This must
+                    always contain a Provider identifier, as all endpoints are associated
+                    with one. It can then have a hostname, IP address, or both. If
+                    it has both, these should be the same resource, eg: \n Acceptable:
+                    - ip: 1.2.3.4   host: lb-1-2-3-4.provider.example.com \n Not Acceptable:
+                    - ip: 1.2.3.4   host: lb-4-5-6-7.provider.example.com \n If there
+                    are two distinct endpoints, one with an ip and one with host,
+                    just specify these as seperate Endpoint items: - ip: 1.2.3.4 -
+                    host: lb-4-5-6-7.provider.example.com"
+                  properties:
+                    host:
+                      description: A hostname that the distribution is available at
+                      type: string
+                    ip:
+                      description: An IP address that the distribution is available
+                        at
+                      type: string
+                    provider:
+                      description: The name of the provider that is responsible for
+                        this endpoint (eg "cloudfront")
+                      type: string
+                  required:
+                  - provider
+                  type: object
+                type: array
+              ready:
+                type: boolean
+            required:
+            - ready
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
