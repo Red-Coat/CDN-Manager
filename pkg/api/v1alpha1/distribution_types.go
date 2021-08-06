@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -108,20 +109,6 @@ type DistributionSpec struct {
 	TLS *TLSSpec `json:"tls"`
 }
 
-// The status of a CloudFront Distribution, if one was requested by the
-// DistributionClass
-type CloudFrontStatus struct {
-	// The CloudFront State as reported by the AWS API. NB: "InProgress"
-	// does not always mean the distribution is not yet available as
-	// sometimes this occurs when minor items are being updated.
-	//+kubebuilder:validation:Enum=Deployed;Disabled;InProgress
-	State string `json:"state"`
-
-	// The ID of the CloudFront Distribution (you can use this in any
-	// interaction with the aws cloudfront api).
-	ID string `json:"id"`
-}
-
 // Information about a specific Endpoint
 //
 // This must always contain a Provider identifier, as all endpoints are
@@ -165,7 +152,7 @@ type DistributionStatus struct {
 	Endpoints []Endpoint `json:"endpoints"`
 
 	//+optional
-	CloudFront *CloudFrontStatus `json:"cloudfront,omitempty"`
+	CloudFront *cloudfront.CloudFrontStatus `json:"cloudfront,omitempty"`
 }
 
 //+kubebuilder:object:root=true

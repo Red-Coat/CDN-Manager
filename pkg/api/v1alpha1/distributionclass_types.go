@@ -17,33 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+	"git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// The access details for cloudfront distributions
-// If this section is provided, a cloudfront distribution will be setup,
-// even if access details are not given in this block.
-type CloudFrontSpec struct {
-	// The AccessKeyID is used for authentication.
-	// If not set we fall-back to using env vars, shared credentials file
-	// or AWS Instance metadata
-	// see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
-	// +optional
-	AccessKeyID string `json:"accessKeyID,omitempty"`
-
-	// The SecretAccessKey is used for authentication. If not set we
-	// fall-back to using env vars, shared credentials file or AWS
-	// Instance metadata
-	// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
-	// +optional
-	SecretAccessKey *cmmeta.SecretKeySelector `json:"secretAccessKeySecretRef"`
-}
-
 type ProviderList struct {
-	// Deploy Distributions to AWS CloudFront
 	// +optional
-	CloudFront *CloudFrontSpec `json:"cloudfront,omitempty"`
+	CloudFront *cloudfront.CloudFrontSpec `json:"cloudfront,omitempty"`
 }
 
 // Desired state of the DistributionClass Resource

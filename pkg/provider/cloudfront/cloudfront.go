@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
+	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
 )
@@ -32,7 +33,7 @@ type Provider struct {
 	Client         *cloudfront.CloudFront
 	Distribution   *api.Distribution
 	Origin         kubernetes.ResolvedOrigin
-	PreviousStatus *api.CloudFrontStatus
+	PreviousStatus *cfapi.CloudFrontStatus
 	Endpoints      []api.Endpoint
 }
 
@@ -55,7 +56,7 @@ func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigi
 }
 
 // Returns the current CloudFront status
-func (c *Provider) GetStatus() *api.CloudFrontStatus {
+func (c *Provider) GetStatus() *cfapi.CloudFrontStatus {
 	return c.Distribution.Status.CloudFront
 }
 
@@ -202,7 +203,7 @@ func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 
 // Sets the Status based on the Status returned by the AWS API
 func (c *Provider) SetStatus(Distribution *cloudfront.Distribution) {
-	c.Distribution.Status.CloudFront = &api.CloudFrontStatus{
+	c.Distribution.Status.CloudFront = &cfapi.CloudFrontStatus{
 		State: *Distribution.Status,
 		ID:    *Distribution.Id,
 	}
