@@ -32,6 +32,8 @@ import (
 	"git.redcoat.dev/cdn/pkg/provider"
 	"git.redcoat.dev/cdn/pkg/provider/cloudfront"
 	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
+	corev1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1"
 )
 
 // DistributionReconciler reconciles a Distribution object
@@ -122,21 +124,21 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return result, nil
 }
 
-func (r *DistributionReconciler) Watch(
+func Watch(
 	builder *builder.Builder,
 	mgr ctrl.Manager,
 	kind client.Object,
-	cacheKey string,
-	cache func(*api.Distribution) string,
+	cache func(*api.Distribution) *api.ObjectReference,
 	namespaced bool,
 ) {
-	mgr.GetFieldIndexer().IndexField(
-		context.Background(),
-		&api.Distribution{},
-		cacheKey,
+	kindName := kind.GetObjectKind().GroupVersionKind().Kind
+	ctx := context.Background()
+
+	mgr.GetFieldIndexer().IndexField(ctx, &api.Distribution{}, kindName,
 		func(object client.Object) []string {
-			if key := cache(object.(*api.Distribution)); key != "" {
-				return []string{key}
+			ref := cache(object.(*api.Distribution))
+			if ref != nil && ref.Kind == kindName {
+				return []string{ref.Name}
 			} else {
 				return []string{}
 			}
@@ -147,17 +149,15 @@ func (r *DistributionReconciler) Watch(
 		&source.Kind{Type: kind},
 		handler.EnqueueRequestsFromMapFunc(
 			func(object client.Object) []ctrl.Request {
-				ctx := context.Background()
-
 				var distroList api.DistributionList
-				predicate := client.MatchingFields{cacheKey: object.GetName()}
+				predicate := client.MatchingFields{kindName: object.GetName()}
 
 				if namespaced {
-					r.List(ctx, &distroList, predicate,
+					mgr.GetClient().List(ctx, &distroList, predicate,
 						client.InNamespace(object.GetNamespace()),
 					)
 				} else {
-					r.List(ctx, &distroList, predicate)
+					mgr.GetClient().List(ctx, &distroList, predicate)
 				}
 
 				requests := make([]ctrl.Request, len(distroList.Items))
@@ -173,36 +173,22 @@ func (r *DistributionReconciler) Watch(
 	)
 }
 
-func DistributionClassRefChecker(Kind string) func(*api.Distribution) string {
-	return func(distro *api.Distribution) string {
-		if distro.Spec.DistributionClassRef.Kind == Kind {
-			return distro.Spec.DistributionClassRef.Name
-		} else {
-			return ""
-		}
-	}
+func GetDistributionClassRef(distro *api.Distribution) *api.ObjectReference {
+	return &distro.Spec.DistributionClassRef
+}
+
+func GetOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
+	return distro.Spec.Origin.Target
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
-	r.Watch(
-		builder,
-		mgr,
-		&api.DistributionClass{},
-		"distributionClass",
-		DistributionClassRefChecker("DistributionClass"),
-		true,
-	)
-	r.Watch(
-		builder,
-		mgr,
-		&api.ClusterDistributionClass{},
-		"clusterDistributionClass",
-		DistributionClassRefChecker("ClusterDistributionClass"),
-		false,
-	)
+	Watch(builder, mgr, &api.DistributionClass{}, GetDistributionClassRef, true)
+	Watch(builder, mgr, &api.ClusterDistributionClass{}, GetDistributionClassRef, false)
+	Watch(builder, mgr, &corev1.Service{}, GetOriginTargetRef, true)
+	Watch(builder, mgr, &networking.Ingress{}, GetOriginTargetRef, true)
 
 	return builder.Complete(r)
 }
