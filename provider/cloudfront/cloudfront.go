@@ -38,7 +38,7 @@ type Provider struct {
 
 // Creates a new CloudFront Provider from the given Distribution and
 // calculated ResolvedOrigin
-func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigin) (*Provider, error) {
+func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigin) *Provider {
 	config := aws.NewConfig()
 	sessionOpts := session.Options{
 		Config: *config,
@@ -51,7 +51,7 @@ func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigi
 		Distribution:   distribution,
 		Origin:         origin,
 		PreviousStatus: distribution.Status.CloudFront,
-	}, nil
+	}
 }
 
 // Returns the current CloudFront status
@@ -302,6 +302,18 @@ func (c *Provider) IsDirty() bool {
 // its update progress and, hopefully, update the Status to Deployed.
 func (c *Provider) NeedsRecheck() bool {
 	return c.GetStatus().State != "Deployed"
+}
+
+func (c *Provider) Has() bool {
+	return c.GetStatus() != nil
+}
+
+func (c *Provider) Wants(spec api.DistributionClassSpec) bool {
+	return spec.Providers.CloudFront != nil
+}
+
+func (c *Provider) GetEndpoints() []api.Endpoint {
+	return c.Endpoints
 }
 
 // Checks if the CloudFront Distribution is ready

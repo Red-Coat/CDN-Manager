@@ -28,7 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	cdnv1alpha1 "redcoat.dev/cdn/api/v1alpha1"
+	api "redcoat.dev/cdn/api/v1alpha1"
+	"redcoat.dev/cdn/provider"
 	"redcoat.dev/cdn/provider/cloudfront"
 	"redcoat.dev/cdn/provider/kubernetes"
 )
@@ -48,19 +49,19 @@ type DistributionReconciler struct {
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	var distro cdnv1alpha1.Distribution
-	var class cdnv1alpha1.DistributionClassSpec
+	var distro api.Distribution
+	var class api.DistributionClassSpec
 
 	r.Get(ctx, req.NamespacedName, &distro)
 
 	if distro.Spec.DistributionClassRef.Kind == "ClusterDistributionClass" {
-		var parent cdnv1alpha1.ClusterDistributionClass
+		var parent api.ClusterDistributionClass
 		r.Get(ctx, client.ObjectKey{
 			Name: distro.Spec.DistributionClassRef.Name,
 		}, &parent)
 		class = parent.Spec
 	} else {
-		var parent cdnv1alpha1.DistributionClass
+		var parent api.DistributionClass
 		r.Get(ctx, client.ObjectKey{
 			Namespace: distro.Namespace,
 			Name:      distro.Spec.DistributionClassRef.Name,
@@ -71,46 +72,47 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 
 	if err != nil {
-		log.Info("Bad Origin Configuration", "error", err, "resolved", resolvedOrigin)
+		log.Error(err, "resolved", resolvedOrigin)
 		return ctrl.Result{}, nil
 	}
 
-	if class.Providers.CloudFront == nil {
-		log.Info("CloudFront not requested. Ignoring Resource")
-		// TODO Check status and cleanup distro if needed
-
-		return ctrl.Result{}, nil
+	dirty := false
+	recheck := false
+	distro.Status.Ready = true
+	distro.Status.Endpoints = []api.Endpoint{}
+	providers := []provider.Provider{
+		cloudfront.NewProvider(&distro, *resolvedOrigin),
 	}
 
-	log.Info("CloudFront requested, processing...")
+	for _, provider := range providers {
+		if !provider.Wants(class) {
+			continue
+		}
 
-	provider, _ := cloudfront.NewProvider(&distro, *resolvedOrigin)
-
-	if provider.GetStatus() != nil {
-		log.Info("Status found, performing checks")
-		err := provider.Check()
+		var err error
+		if provider.Has() {
+			err = provider.Check()
+		} else {
+			err = provider.Create()
+		}
 
 		if err != nil {
 			log.Info("Error", "error", err)
 		}
-	} else {
-		log.Info("No status found, creating resource")
-		err := provider.Create()
 
-		if err != nil {
-			log.Info("Error", "error", err)
-		}
+		dirty = provider.IsDirty() || dirty
+		recheck = recheck || provider.NeedsRecheck()
+		distro.Status.Ready = distro.Status.Ready && provider.IsReady()
+		distro.Status.Endpoints = append(distro.Status.Endpoints, provider.GetEndpoints()...)
 	}
 
-	if provider.IsDirty() {
-		distro.Status.Ready = provider.IsReady()
-		distro.Status.Endpoints = provider.Endpoints
+	if dirty {
 		r.Status().Update(ctx, &distro)
 	}
 
 	var result ctrl.Result
 
-	if provider.NeedsRecheck() {
+	if recheck {
 		result.RequeueAfter, _ = time.ParseDuration("1m")
 	}
 
@@ -122,15 +124,15 @@ func (r *DistributionReconciler) Watch(
 	mgr ctrl.Manager,
 	kind client.Object,
 	cacheKey string,
-	cache func(*cdnv1alpha1.Distribution) string,
+	cache func(*api.Distribution) string,
 	namespaced bool,
 ) {
 	mgr.GetFieldIndexer().IndexField(
 		context.Background(),
-		&cdnv1alpha1.Distribution{},
+		&api.Distribution{},
 		cacheKey,
 		func(object client.Object) []string {
-			if key := cache(object.(*cdnv1alpha1.Distribution)); key != "" {
+			if key := cache(object.(*api.Distribution)); key != "" {
 				return []string{key}
 			} else {
 				return []string{}
@@ -144,7 +146,7 @@ func (r *DistributionReconciler) Watch(
 			func(object client.Object) []ctrl.Request {
 				ctx := context.Background()
 
-				var distroList cdnv1alpha1.DistributionList
+				var distroList api.DistributionList
 				predicate := client.MatchingFields{cacheKey: object.GetName()}
 
 				if namespaced {
@@ -168,8 +170,8 @@ func (r *DistributionReconciler) Watch(
 	)
 }
 
-func DistributionClassRefChecker(Kind string) func(*cdnv1alpha1.Distribution) string {
-	return func(distro *cdnv1alpha1.Distribution) string {
+func DistributionClassRefChecker(Kind string) func(*api.Distribution) string {
+	return func(distro *api.Distribution) string {
 		if distro.Spec.DistributionClassRef.Kind == Kind {
 			return distro.Spec.DistributionClassRef.Name
 		} else {
@@ -180,12 +182,12 @@ func DistributionClassRefChecker(Kind string) func(*cdnv1alpha1.Distribution) st
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	builder := ctrl.NewControllerManagedBy(mgr).For(&cdnv1alpha1.Distribution{})
+	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
 	r.Watch(
 		builder,
 		mgr,
-		&cdnv1alpha1.DistributionClass{},
+		&api.DistributionClass{},
 		"distributionClass",
 		DistributionClassRefChecker("DistributionClass"),
 		true,
@@ -193,7 +195,7 @@ func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Watch(
 		builder,
 		mgr,
-		&cdnv1alpha1.ClusterDistributionClass{},
+		&api.ClusterDistributionClass{},
 		"clusterDistributionClass",
 		DistributionClassRefChecker("ClusterDistributionClass"),
 		false,
