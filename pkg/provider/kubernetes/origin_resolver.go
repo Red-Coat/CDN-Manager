@@ -52,7 +52,7 @@ func (r *ResolvedOrigin) IsComplete() bool {
 
 // Checks to see if a custom hostname has been specified - if it has,
 // this takes precedence and is immediately set
-func (r *OriginResolver) ResolveCustomHost() {
+func (r *OriginResolver) resolveCustomHost() {
 	if r.Origin.Host != "" {
 		r.Resolved.Host = r.Origin.Host
 	}
@@ -60,7 +60,7 @@ func (r *OriginResolver) ResolveCustomHost() {
 
 // Checks to see if a port number has been given for the given port - if
 // it has, this takes precedence and is immediately set
-func ResolveCustomPort(port *api.ServicePort, dest *int32) {
+func resolveCustomPort(port *api.ServicePort, dest *int32) {
 	if port != nil && port.Number != 0 {
 		*dest = port.Number
 	}
@@ -68,7 +68,7 @@ func ResolveCustomPort(port *api.ServicePort, dest *int32) {
 
 // Checks to see if the given named Service Port matches a the name of a
 // port on the Distribution - if it does we'll use its value
-func SetPort(port corev1.ServicePort, portSpec *api.ServicePort, dest *int32) {
+func setPort(port corev1.ServicePort, portSpec *api.ServicePort, dest *int32) {
 	if portSpec != nil && port.Name == portSpec.Name {
 		*dest = port.Port
 	}
@@ -77,7 +77,7 @@ func SetPort(port corev1.ServicePort, portSpec *api.ServicePort, dest *int32) {
 // Loads a resource (either Ingress or Service) by looking for the
 // resource by the name given in the Distribution resource, and in the
 // same namespace
-func (r *OriginResolver) LoadResource(obj client.Object) {
+func (r *OriginResolver) loadResource(obj client.Object) {
 	r.Get(context.TODO(), client.ObjectKey{
 		Namespace: r.Namespace,
 		Name:      r.Origin.Target.Name,
@@ -86,7 +86,7 @@ func (r *OriginResolver) LoadResource(obj client.Object) {
 
 // Checks to see if a LoadBalancerIngress[] resource has any values and
 // uses this as the origin hostname if it does
-func (r *OriginResolver) ResolveLoadBalancer(ingress []corev1.LoadBalancerIngress) {
+func (r *OriginResolver) resolveLoadBalancer(ingress []corev1.LoadBalancerIngress) {
 	// If the Host is already set, it must have been via the custom field,
 	// which is the first thing that is checked. This field takes
 	// precedence over autodiscovered ones so we can skip this check here.
@@ -109,25 +109,25 @@ func (r *OriginResolver) ResolveLoadBalancer(ingress []corev1.LoadBalancerIngres
 // will be used as the origin.
 // The service's named ports will be checked against the named ports on
 // the Distribution
-func (r *OriginResolver) ResolveService() {
+func (r *OriginResolver) resolveService() {
 	var svc corev1.Service
-	r.LoadResource(&svc)
+	r.loadResource(&svc)
 
-	r.ResolveLoadBalancer(svc.Status.LoadBalancer.Ingress)
+	r.resolveLoadBalancer(svc.Status.LoadBalancer.Ingress)
 
 	for _, port := range svc.Spec.Ports {
-		SetPort(port, r.Origin.HTTPPort, &r.Resolved.HTTPPort)
-		SetPort(port, r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
+		setPort(port, r.Origin.HTTPPort, &r.Resolved.HTTPPort)
+		setPort(port, r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
 	}
 }
 
 // Loads an Ingress Resoruce and tries to infer origin hostname from its
 // loadbalancer, if it is set
-func (r *OriginResolver) ResolveIngress() {
+func (r *OriginResolver) resolveIngress() {
 	var ing networking.Ingress
-	r.LoadResource(&ing)
+	r.loadResource(&ing)
 
-	r.ResolveLoadBalancer(ing.Status.LoadBalancer.Ingress)
+	r.resolveLoadBalancer(ing.Status.LoadBalancer.Ingress)
 }
 
 // Inspects a Distribution and tries to resolve its origin details from
@@ -136,9 +136,9 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (ResolvedOrigin, error
 	r.Origin = distro.Spec.Origin
 	r.Resolved = &ResolvedOrigin{}
 
-	r.ResolveCustomHost()
-	ResolveCustomPort(r.Origin.HTTPPort, &r.Resolved.HTTPPort)
-	ResolveCustomPort(r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
+	r.resolveCustomHost()
+	resolveCustomPort(r.Origin.HTTPPort, &r.Resolved.HTTPPort)
+	resolveCustomPort(r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
 
 	if r.Resolved.IsComplete() {
 		return *r.Resolved, nil
@@ -146,9 +146,9 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (ResolvedOrigin, error
 
 	if r.Origin.Target != nil {
 		if r.Origin.Target.Kind == "Service" {
-			r.ResolveService()
+			r.resolveService()
 		} else {
-			r.ResolveIngress()
+			r.resolveIngress()
 		}
 	}
 

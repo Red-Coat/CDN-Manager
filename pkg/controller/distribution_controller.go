@@ -54,8 +54,8 @@ type DistributionReconciler struct {
 //+kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
 
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	distro, class := r.Load(ctx, req)
-	result, newStatus := r.ReconcileProviders(ctx, class, distro)
+	distro, class := r.load(ctx, req)
+	result, newStatus := r.reconcileProviders(ctx, class, distro)
 
 	if !reflect.DeepEqual(newStatus, distro.Status) {
 		distro.Status = &newStatus
@@ -77,7 +77,7 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 // The reason this gives the _spec_ for the distribution class is that
 // it'll load either the ClusterDistributionClass or the namespaced
 // DistributionClass, depending on which is referenced.
-func (r *DistributionReconciler) Load(
+func (r *DistributionReconciler) load(
 	ctx context.Context,
 	req ctrl.Request,
 ) (api.Distribution, api.DistributionClassSpec) {
@@ -102,7 +102,7 @@ func (r *DistributionReconciler) Load(
 
 // Loops over the Providers and asks each one to reconicle if it has
 // configuration for the distribution class
-func (r *DistributionReconciler) ReconcileProviders(
+func (r *DistributionReconciler) reconcileProviders(
 	ctx context.Context,
 	class api.DistributionClassSpec,
 	distro api.Distribution,
@@ -137,7 +137,7 @@ func (r *DistributionReconciler) ReconcileProviders(
 	return result, newStatus
 }
 
-func Watch(
+func watch(
 	builder *builder.Builder,
 	mgr ctrl.Manager,
 	kind client.Object,
@@ -186,11 +186,11 @@ func Watch(
 	)
 }
 
-func GetDistributionClassRef(distro *api.Distribution) *api.ObjectReference {
+func getDistributionClassRef(distro *api.Distribution) *api.ObjectReference {
 	return &distro.Spec.DistributionClassRef
 }
 
-func GetOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
+func getOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
 	return distro.Spec.Origin.Target
 }
 
@@ -198,10 +198,10 @@ func GetOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
 func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
-	Watch(builder, mgr, &api.DistributionClass{}, GetDistributionClassRef, true)
-	Watch(builder, mgr, &api.ClusterDistributionClass{}, GetDistributionClassRef, false)
-	Watch(builder, mgr, &corev1.Service{}, GetOriginTargetRef, true)
-	Watch(builder, mgr, &networking.Ingress{}, GetOriginTargetRef, true)
+	watch(builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
+	watch(builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
+	watch(builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
+	watch(builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
 
 	r.Providers = []provider.CDNProvider{
 		cloudfront.CloudFrontProvider{},

@@ -48,7 +48,7 @@ type DistributionProvider struct {
 // HEAD and GET requests are always cached. POST, PUT, and DELETE are
 // never cached. OPTIONS can optionally be cached (this method will
 // always cache OPTIONS, if it is set)
-func (c *DistributionProvider) CalculateMethods() ([]string, []string) {
+func (c *DistributionProvider) calculateMethods() ([]string, []string) {
 	methods := []string{"HEAD", "GET"}
 	for _, header := range c.Distribution.Spec.SupportedMethods {
 		if header == "OPTIONS" {
@@ -64,7 +64,7 @@ func (c *DistributionProvider) CalculateMethods() ([]string, []string) {
 
 // Calculates the CloudFront TLS ViewerPolicy from the Distribution's
 // TLS Settings
-func (c *DistributionProvider) CalculateViewerPolicy() string {
+func (c *DistributionProvider) calculateViewerPolicy() string {
 	tls := c.Distribution.Spec.TLS
 	if tls == nil || tls.Mode == "both" {
 		return cloudfront.ViewerProtocolPolicyAllowAll
@@ -82,8 +82,8 @@ func (c *DistributionProvider) CalculateViewerPolicy() string {
 // This is used to create new Distributions, to compare against existing
 // Distributions, and to update Distributions if their state does not
 // match.
-func (c *DistributionProvider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
-	supportedMethods, cachedMethods := c.CalculateMethods()
+func (c *DistributionProvider) generateDistributionConfig() *cloudfront.DistributionConfig {
+	supportedMethods, cachedMethods := c.calculateMethods()
 
 	return &cloudfront.DistributionConfig{
 		CallerReference: aws.String(string(c.Distribution.UID)),
@@ -150,7 +150,7 @@ func (c *DistributionProvider) GenerateDistributionConfig() *cloudfront.Distribu
 		HttpVersion:       aws.String("http2"),
 		DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
 			TargetOriginId:        aws.String(c.Origin.Host),
-			ViewerProtocolPolicy:  aws.String(c.CalculateViewerPolicy()),
+			ViewerProtocolPolicy:  aws.String(c.calculateViewerPolicy()),
 			Compress:              aws.Bool(true),
 			CachePolicyId:         aws.String("658327ea-f89d-4fab-a63d-7e88639e58f6"),
 			OriginRequestPolicyId: aws.String("216adef6-5c7f-47e4-b989-5492eafa07d3"),
@@ -177,7 +177,7 @@ func (c *DistributionProvider) GenerateDistributionConfig() *cloudfront.Distribu
 }
 
 // Sets the Status based on the Status returned by the AWS API
-func (c *DistributionProvider) SetStatus(Distribution *cloudfront.Distribution) {
+func (c *DistributionProvider) setStatus(Distribution *cloudfront.Distribution) {
 	c.Status.CloudFront = &cfapi.CloudFrontStatus{
 		State: *Distribution.Status,
 		ID:    *Distribution.Id,
@@ -211,8 +211,8 @@ func (c *DistributionProvider) Check() error {
 		return err
 	}
 
-	c.SetStatus(current.Distribution)
-	desired := c.GenerateDistributionConfig()
+	c.setStatus(current.Distribution)
+	desired := c.generateDistributionConfig()
 
 	// If nothing has changed, we do not need to request an update
 	if reflect.DeepEqual(desired, current.Distribution.DistributionConfig) {
@@ -229,7 +229,7 @@ func (c *DistributionProvider) Check() error {
 		return err
 	}
 
-	c.SetStatus(updated.Distribution)
+	c.setStatus(updated.Distribution)
 
 	return nil
 }
@@ -245,14 +245,14 @@ func (c *DistributionProvider) Check() error {
 //   Distribution has been destroyed).
 func (c *DistributionProvider) Create() error {
 	info, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
-		DistributionConfig: c.GenerateDistributionConfig(),
+		DistributionConfig: c.generateDistributionConfig(),
 	})
 
 	if err != nil {
 		return err
 	}
 
-	c.SetStatus(info.Distribution)
+	c.setStatus(info.Distribution)
 
 	return nil
 }
