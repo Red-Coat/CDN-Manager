@@ -137,7 +137,7 @@ func (r *DistributionReconciler) reconcileProviders(
 	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 
 	if err != nil {
-		log.Error(err, "resolved", resolvedOrigin)
+		log.Error(err, "Unable to resolve origin")
 		r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
 		return ctrl.Result{}
 	}
@@ -157,7 +157,7 @@ func (r *DistributionReconciler) reconcileProviders(
 			// In the event of an error we'll requeue immediately
 			result.Requeue = true
 			newStatus.Ready = false
-			log.Info("Error", "error", err)
+			log.Error(err, "Unable to run provider")
 		}
 	}
 
