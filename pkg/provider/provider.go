@@ -17,16 +17,46 @@ package provider
 
 import (
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
+	k8s "git.redcoat.dev/cdn/pkg/provider/kubernetes"
 )
 
-type Provider interface {
-	Create() error
-	Check() error
-	Delete()
-	IsDirty() bool
-	Has() bool
+// A CDNProvider is the top level logic holder for a CDN integration (eg
+// CloudFront)
+type CDNProvider interface {
+	// Checks if the given DistributionClassSpec includes details for this
+	// provider
+	//
+	// Normally this would be a simple check:
+	//   spec.Providers.[ProviderName] != nil
 	Wants(api.DistributionClassSpec) bool
-	IsReady() bool
-	NeedsRecheck() bool
-	GetEndpoints() []api.Endpoint
+
+	// Checks if the given DistributionStatus already has a status for
+	// this provider
+	//
+	// Normally this would be a simple check:
+	//   status.[ProviderName] != nil
+	Has(api.DistributionStatus) bool
+
+	// Creates a specific DistributionProvider for the given Distribution,
+	// ResolvedOrigin, and DistribitionClassSpec
+	//
+	// This is typically called by the DistributionController after it has
+	// determined if this CDNProvider is likely to be interested in the
+	// Distribution (via a Wants() check).
+	//
+	// It is passed a pointer to the DistributionStatus as it is expected
+	// to make changes to its status. The Distribution itself is
+	// immutable.
+	Reconcile(
+		api.DistributionClassSpec,
+		api.Distribution,
+		k8s.ResolvedOrigin,
+		*api.DistributionStatus,
+	) error
+
+	Delete(
+		api.DistributionClassSpec,
+		api.Distribution,
+		*api.DistributionStatus,
+	) error
 }

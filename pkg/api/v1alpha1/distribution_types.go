@@ -166,7 +166,7 @@ type Distribution struct {
 	Spec DistributionSpec `json:"spec"`
 
 	// +optional
-	Status DistributionStatus `json:"status"`
+	Status *DistributionStatus `json:"status"`
 }
 
 //+kubebuilder:object:root=true

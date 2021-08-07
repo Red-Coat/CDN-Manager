@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +42,7 @@ type DistributionReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
 	OriginResolver *kubernetes.OriginResolver
+	Providers      []provider.CDNProvider
 }
 
 //+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update;patch;delete
@@ -52,11 +54,34 @@ type DistributionReconciler struct {
 //+kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
 
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	distro, class := r.Load(ctx, req)
+	result, newStatus := r.ReconcileProviders(ctx, class, distro)
 
+	if !reflect.DeepEqual(newStatus, distro.Status) {
+		distro.Status = &newStatus
+		r.Status().Update(ctx, &distro)
+	}
+
+	// If there hasn't been an error requiring immediate requeue, but we
+	// aren't ready yet, we'll requeue in a minute
+	if !result.Requeue && !distro.Status.Ready {
+		result.RequeueAfter, _ = time.ParseDuration("1m")
+	}
+
+	return result, nil
+}
+
+// Loads a k8s Distribution and the DistributionClassSpec for its
+// referenced distribution class
+//
+// The reason this gives the _spec_ for the distribution class is that
+// it'll load either the ClusterDistributionClass or the namespaced
+// DistributionClass, depending on which is referenced.
+func (r *DistributionReconciler) Load(
+	ctx context.Context,
+	req ctrl.Request,
+) (api.Distribution, api.DistributionClassSpec) {
 	var distro api.Distribution
-	var class api.DistributionClassSpec
-
 	r.Get(ctx, req.NamespacedName, &distro)
 
 	if distro.Spec.DistributionClassRef.Kind == "ClusterDistributionClass" {
@@ -64,64 +89,52 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.Get(ctx, client.ObjectKey{
 			Name: distro.Spec.DistributionClassRef.Name,
 		}, &parent)
-		class = parent.Spec
+		return distro, parent.Spec
 	} else {
 		var parent api.DistributionClass
 		r.Get(ctx, client.ObjectKey{
 			Namespace: distro.Namespace,
 			Name:      distro.Spec.DistributionClassRef.Name,
 		}, &parent)
-		class = parent.Spec
+		return distro, parent.Spec
 	}
+}
 
+// Loops over the Providers and asks each one to reconicle if it has
+// configuration for the distribution class
+func (r *DistributionReconciler) ReconcileProviders(
+	ctx context.Context,
+	class api.DistributionClassSpec,
+	distro api.Distribution,
+) (ctrl.Result, api.DistributionStatus) {
+	log := log.FromContext(ctx)
 	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 
 	if err != nil {
 		log.Error(err, "resolved", resolvedOrigin)
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, api.DistributionStatus{Ready: false}
 	}
 
-	dirty := false
-	recheck := false
-	distro.Status.Ready = true
-	distro.Status.Endpoints = []api.Endpoint{}
-	providers := []provider.Provider{
-		cloudfront.NewProvider(&distro, *resolvedOrigin),
-	}
+	newStatus := api.DistributionStatus{Ready: true}
 
-	for _, provider := range providers {
+	var result ctrl.Result
+
+	for _, provider := range r.Providers {
 		if !provider.Wants(class) {
 			continue
 		}
 
-		var err error
-		if provider.Has() {
-			err = provider.Check()
-		} else {
-			err = provider.Create()
-		}
+		err := provider.Reconcile(class, distro, resolvedOrigin, &newStatus)
 
 		if err != nil {
+			// In the event of an error we'll requeue immediately
+			result.Requeue = true
+			newStatus.Ready = false
 			log.Info("Error", "error", err)
 		}
-
-		dirty = provider.IsDirty() || dirty
-		recheck = recheck || provider.NeedsRecheck()
-		distro.Status.Ready = distro.Status.Ready && provider.IsReady()
-		distro.Status.Endpoints = append(distro.Status.Endpoints, provider.GetEndpoints()...)
 	}
 
-	if dirty {
-		r.Status().Update(ctx, &distro)
-	}
-
-	var result ctrl.Result
-
-	if recheck {
-		result.RequeueAfter, _ = time.ParseDuration("1m")
-	}
-
-	return result, nil
+	return result, newStatus
 }
 
 func Watch(
@@ -189,6 +202,10 @@ func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	Watch(builder, mgr, &api.ClusterDistributionClass{}, GetDistributionClassRef, false)
 	Watch(builder, mgr, &corev1.Service{}, GetOriginTargetRef, true)
 	Watch(builder, mgr, &networking.Ingress{}, GetOriginTargetRef, true)
+
+	r.Providers = []provider.CDNProvider{
+		cloudfront.CloudFrontProvider{},
+	}
 
 	return builder.Complete(r)
 }

@@ -132,7 +132,7 @@ func (r *OriginResolver) ResolveIngress() {
 
 // Inspects a Distribution and tries to resolve its origin details from
 // it
-func (r *OriginResolver) Resolve(distro api.Distribution) (*ResolvedOrigin, error) {
+func (r *OriginResolver) Resolve(distro api.Distribution) (ResolvedOrigin, error) {
 	r.Origin = distro.Spec.Origin
 	r.Resolved = &ResolvedOrigin{}
 
@@ -141,7 +141,7 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (*ResolvedOrigin, erro
 	ResolveCustomPort(r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
 
 	if r.Resolved.IsComplete() {
-		return r.Resolved, nil
+		return *r.Resolved, nil
 	}
 
 	if r.Origin.Target != nil {
@@ -153,8 +153,8 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (*ResolvedOrigin, erro
 	}
 
 	if !r.Resolved.IsComplete() {
-		return r.Resolved, fmt.Errorf("Not all information was provided")
+		return *r.Resolved, fmt.Errorf("Not all information was provided")
 	}
 
-	return r.Resolved, nil
+	return *r.Resolved, nil
 }

@@ -21,7 +21,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
 	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
@@ -29,35 +28,11 @@ import (
 	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
 )
 
-type Provider struct {
-	Client         *cloudfront.CloudFront
-	Distribution   *api.Distribution
-	Origin         kubernetes.ResolvedOrigin
-	PreviousStatus *cfapi.CloudFrontStatus
-	Endpoints      []api.Endpoint
-}
-
-// Creates a new CloudFront Provider from the given Distribution and
-// calculated ResolvedOrigin
-func NewProvider(distribution *api.Distribution, origin kubernetes.ResolvedOrigin) *Provider {
-	config := aws.NewConfig()
-	sessionOpts := session.Options{
-		Config: *config,
-	}
-	sess, _ := session.NewSessionWithOptions(sessionOpts)
-	client := cloudfront.New(sess)
-
-	return &Provider{
-		Client:         client,
-		Distribution:   distribution,
-		Origin:         origin,
-		PreviousStatus: distribution.Status.CloudFront,
-	}
-}
-
-// Returns the current CloudFront status
-func (c *Provider) GetStatus() *cfapi.CloudFrontStatus {
-	return c.Distribution.Status.CloudFront
+type DistributionProvider struct {
+	Client       *cloudfront.CloudFront
+	Distribution api.Distribution
+	Origin       kubernetes.ResolvedOrigin
+	Status       *api.DistributionStatus
 }
 
 // Calculates the Allowed and Cached methods for the CloudFront
@@ -73,7 +48,7 @@ func (c *Provider) GetStatus() *cfapi.CloudFrontStatus {
 // HEAD and GET requests are always cached. POST, PUT, and DELETE are
 // never cached. OPTIONS can optionally be cached (this method will
 // always cache OPTIONS, if it is set)
-func (c *Provider) CalculateMethods() ([]string, []string) {
+func (c *DistributionProvider) CalculateMethods() ([]string, []string) {
 	methods := []string{"HEAD", "GET"}
 	for _, header := range c.Distribution.Spec.SupportedMethods {
 		if header == "OPTIONS" {
@@ -89,7 +64,7 @@ func (c *Provider) CalculateMethods() ([]string, []string) {
 
 // Calculates the CloudFront TLS ViewerPolicy from the Distribution's
 // TLS Settings
-func (c *Provider) CalculateViewerPolicy() string {
+func (c *DistributionProvider) CalculateViewerPolicy() string {
 	tls := c.Distribution.Spec.TLS
 	if tls == nil || tls.Mode == "both" {
 		return cloudfront.ViewerProtocolPolicyAllowAll
@@ -107,7 +82,7 @@ func (c *Provider) CalculateViewerPolicy() string {
 // This is used to create new Distributions, to compare against existing
 // Distributions, and to update Distributions if their state does not
 // match.
-func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
+func (c *DistributionProvider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 	supportedMethods, cachedMethods := c.CalculateMethods()
 
 	return &cloudfront.DistributionConfig{
@@ -202,42 +177,45 @@ func (c *Provider) GenerateDistributionConfig() *cloudfront.DistributionConfig {
 }
 
 // Sets the Status based on the Status returned by the AWS API
-func (c *Provider) SetStatus(Distribution *cloudfront.Distribution) {
-	c.Distribution.Status.CloudFront = &cfapi.CloudFrontStatus{
+func (c *DistributionProvider) SetStatus(Distribution *cloudfront.Distribution) {
+	c.Status.CloudFront = &cfapi.CloudFrontStatus{
 		State: *Distribution.Status,
 		ID:    *Distribution.Id,
 	}
-	c.Endpoints = []api.Endpoint{api.Endpoint{
+	c.Status.Endpoints = append(c.Status.Endpoints, api.Endpoint{
 		Provider: "cloudfront",
 		Host:     *Distribution.DomainName,
-	}}
+	})
+	c.Status.Ready = c.Status.Ready && c.Status.CloudFront.State == "Deployed"
 }
 
 // Checks an existing Distribution's state matches with what is expected
 // and updates it if not
-func (c *Provider) Check() error {
-	id := &c.GetStatus().ID
+func (c *DistributionProvider) Check() error {
+	id := &c.Distribution.Status.CloudFront.ID
 
 	current, err := c.Client.GetDistribution(&cloudfront.GetDistributionInput{
 		Id: id,
 	})
-	c.SetStatus(current.Distribution)
 
-	if awserr, ok := err.(awserr.RequestFailure); ok && awserr.StatusCode() == 404 {
+	if awserr, ok := err.(awserr.RequestFailure); ok && awserr.StatusCode() != 404 {
 		return c.Create()
 	} else if err != nil {
+		c.Status.CloudFront = c.Distribution.Status.CloudFront
+		for _, endpoint := range c.Distribution.Status.Endpoints {
+			if endpoint.Provider == "cloudfront" {
+				c.Status.Endpoints = append(c.Status.Endpoints, endpoint)
+				break
+			}
+		}
 		return err
 	}
 
+	c.SetStatus(current.Distribution)
 	desired := c.GenerateDistributionConfig()
 
 	// If nothing has changed, we do not need to request an update
 	if reflect.DeepEqual(desired, current.Distribution.DistributionConfig) {
-		return nil
-	}
-
-	// We will not attempt any rewrites the status is in progress
-	if *current.Distribution.Status == "InProgress" {
 		return nil
 	}
 
@@ -265,63 +243,16 @@ func (c *Provider) Check() error {
 // - The Distribution Controller has found CloudFront state, but when
 //   Check() was running, AWS returned a Not Found on it (implying the
 //   Distribution has been destroyed).
-func (c *Provider) Create() error {
+func (c *DistributionProvider) Create() error {
 	info, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: c.GenerateDistributionConfig(),
 	})
 
-	c.SetStatus(info.Distribution)
-
-	return err
-}
-
-func (c *Provider) Delete() {
-	//
-}
-
-// Checks if the Status has been changed in this run
-//
-// This is used by the Distribution Controller to determine if it should
-// regenerate the Distribution's status and save this back to the
-// api-server.
-func (c *Provider) IsDirty() bool {
-	status := c.GetStatus()
-
-	if status == nil {
-		return false
-	} else if c.PreviousStatus == nil {
-		return true
+	if err != nil {
+		return err
 	}
 
-	return status.ID != c.PreviousStatus.ID || status.State != c.PreviousStatus.State
-}
+	c.SetStatus(info.Distribution)
 
-// Informs the Distribution Controller if this resource needs a recheck
-//
-// When a CloudFront Distribution is InProgress, we need to recheck it
-// sooner than controller-runtime's usual refresh time, to check up on
-// its update progress and, hopefully, update the Status to Deployed.
-func (c *Provider) NeedsRecheck() bool {
-	return c.GetStatus().State != "Deployed"
-}
-
-func (c *Provider) Has() bool {
-	return c.GetStatus() != nil
-}
-
-func (c *Provider) Wants(spec api.DistributionClassSpec) bool {
-	return spec.Providers.CloudFront != nil
-}
-
-func (c *Provider) GetEndpoints() []api.Endpoint {
-	return c.Endpoints
-}
-
-// Checks if the CloudFront Distribution is ready
-//
-// This is used by the Distribution Controller to set the Distribution's
-// overall "Ready" status field. If any Provider returns false, that
-// field will be false.
-func (c *Provider) IsReady() bool {
-	return c.GetStatus().State == "Deployed"
+	return nil
 }
