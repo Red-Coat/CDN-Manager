@@ -26,7 +26,7 @@ import (
 )
 
 type CloudFrontProvider struct {
-	Clients []cloudfront.CloudFront
+	Clients map[string]cloudfront.CloudFront
 }
 
 func (p CloudFrontProvider) Has(status api.DistributionStatus) bool {
@@ -37,6 +37,17 @@ func (p CloudFrontProvider) Wants(class api.DistributionClassSpec) bool {
 	return class.Providers.CloudFront != nil
 }
 
+func (p CloudFrontProvider) getClient(class api.DistributionClassSpec) *cloudfront.CloudFront {
+	config := aws.NewConfig()
+	sessionOpts := session.Options{
+		Config: *config,
+	}
+	sess, _ := session.NewSessionWithOptions(sessionOpts)
+	client := cloudfront.New(sess)
+
+	return client
+}
+
 // Creates a new CloudFront Provider from the given Distribution and
 // calculated ResolvedOrigin
 func (p CloudFrontProvider) Reconcile(
@@ -45,14 +56,8 @@ func (p CloudFrontProvider) Reconcile(
 	origin kubernetes.ResolvedOrigin,
 	status *api.DistributionStatus,
 ) error {
-	config := aws.NewConfig()
-	sessionOpts := session.Options{
-		Config: *config,
-	}
-	sess, _ := session.NewSessionWithOptions(sessionOpts)
-	client := cloudfront.New(sess)
 	provider := DistributionProvider{
-		Client:       client,
+		Client:       p.getClient(class),
 		Distribution: distro,
 		Origin:       origin,
 		Status:       status,
@@ -70,5 +75,11 @@ func (p CloudFrontProvider) Delete(
 	distro api.Distribution,
 	status *api.DistributionStatus,
 ) error {
-	return nil
+	provider := DistributionProvider{
+		Client:       p.getClient(class),
+		Distribution: distro,
+		Status:       status,
+	}
+
+	return provider.Delete()
 }

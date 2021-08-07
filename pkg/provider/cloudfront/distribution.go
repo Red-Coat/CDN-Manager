@@ -33,6 +33,8 @@ type DistributionProvider struct {
 	Distribution api.Distribution
 	Origin       kubernetes.ResolvedOrigin
 	Status       *api.DistributionStatus
+	CurrentState *cloudfront.Distribution
+	DesiredState *cloudfront.DistributionConfig
 }
 
 // Calculates the Allowed and Cached methods for the CloudFront
@@ -82,13 +84,13 @@ func (c *DistributionProvider) calculateViewerPolicy() string {
 // This is used to create new Distributions, to compare against existing
 // Distributions, and to update Distributions if their state does not
 // match.
-func (c *DistributionProvider) generateDistributionConfig() *cloudfront.DistributionConfig {
+func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 	supportedMethods, cachedMethods := c.calculateMethods()
 
-	return &cloudfront.DistributionConfig{
+	c.DesiredState = &cloudfront.DistributionConfig{
 		CallerReference: aws.String(string(c.Distribution.UID)),
 		Comment:         aws.String("Managed By cdn.redcoat.dev"),
-		Enabled:         aws.Bool(true),
+		Enabled:         aws.Bool(enabled),
 		IsIPV6Enabled:   aws.Bool(true),
 		Origins: &cloudfront.Origins{
 			Quantity: aws.Int64(1),
@@ -177,61 +179,85 @@ func (c *DistributionProvider) generateDistributionConfig() *cloudfront.Distribu
 }
 
 // Sets the Status based on the Status returned by the AWS API
-func (c *DistributionProvider) setStatus(Distribution *cloudfront.Distribution) {
+func (c *DistributionProvider) setStatus() {
+	state := c.CurrentState
 	c.Status.CloudFront = &cfapi.CloudFrontStatus{
-		State: *Distribution.Status,
-		ID:    *Distribution.Id,
+		State: *state.Status,
+		ID:    *state.Id,
 	}
 	c.Status.Endpoints = append(c.Status.Endpoints, api.Endpoint{
 		Provider: "cloudfront",
-		Host:     *Distribution.DomainName,
+		Host:     *state.DomainName,
 	})
-	c.Status.Ready = c.Status.Ready && c.Status.CloudFront.State == "Deployed"
+	c.Status.Ready = c.Status.Ready && *state.Status == "Deployed"
+}
+
+func (c *DistributionProvider) load() (*string, error) {
+	res, err := c.Client.GetDistribution(&cloudfront.GetDistributionInput{
+		Id: &c.Distribution.Status.CloudFront.ID,
+	})
+
+	if awserr, ok := err.(awserr.RequestFailure); ok && awserr.StatusCode() != 404 {
+		return nil, nil
+	} else if err != nil {
+		c.useLastKnownStatus()
+		return nil, err
+	} else {
+		c.CurrentState = res.Distribution
+		c.setStatus()
+		return res.ETag, nil
+	}
+}
+
+func (c *DistributionProvider) useLastKnownStatus() {
+	c.Status.CloudFront = c.Distribution.Status.CloudFront
+	for _, endpoint := range c.Distribution.Status.Endpoints {
+		if endpoint.Provider == "cloudfront" {
+			c.Status.Endpoints = append(c.Status.Endpoints, endpoint)
+			break
+		}
+	}
+}
+
+func (c *DistributionProvider) update(etag *string) (*string, error) {
+	res, err := c.Client.UpdateDistribution(&cloudfront.UpdateDistributionInput{
+		DistributionConfig: c.DesiredState,
+		Id:                 c.CurrentState.Id,
+		IfMatch:            etag,
+	})
+
+	if err != nil {
+		c.useLastKnownStatus()
+		return nil, err
+	} else {
+		c.CurrentState = res.Distribution
+		c.setStatus()
+		return res.ETag, nil
+	}
 }
 
 // Checks an existing Distribution's state matches with what is expected
 // and updates it if not
 func (c *DistributionProvider) Check() error {
-	id := &c.Distribution.Status.CloudFront.ID
-
-	current, err := c.Client.GetDistribution(&cloudfront.GetDistributionInput{
-		Id: id,
-	})
-
-	if awserr, ok := err.(awserr.RequestFailure); ok && awserr.StatusCode() != 404 {
-		return c.Create()
-	} else if err != nil {
-		c.Status.CloudFront = c.Distribution.Status.CloudFront
-		for _, endpoint := range c.Distribution.Status.Endpoints {
-			if endpoint.Provider == "cloudfront" {
-				c.Status.Endpoints = append(c.Status.Endpoints, endpoint)
-				break
-			}
-		}
-		return err
-	}
-
-	c.setStatus(current.Distribution)
-	desired := c.generateDistributionConfig()
-
-	// If nothing has changed, we do not need to request an update
-	if reflect.DeepEqual(desired, current.Distribution.DistributionConfig) {
-		return nil
-	}
-
-	updated, err := c.Client.UpdateDistribution(&cloudfront.UpdateDistributionInput{
-		DistributionConfig: desired,
-		Id:                 id,
-		IfMatch:            current.ETag,
-	})
+	etag, err := c.load()
 
 	if err != nil {
 		return err
 	}
 
-	c.setStatus(updated.Distribution)
+	if etag == nil {
+		return c.Create()
+	}
 
-	return nil
+	c.generateDistributionConfig(true)
+
+	// If nothing has changed, we do not need to request an update
+	if reflect.DeepEqual(c.DesiredState, c.CurrentState.DistributionConfig) {
+		return nil
+	}
+
+	_, err = c.update(etag)
+	return err
 }
 
 // Creates a CloudFront Distribution and sets its status on the
@@ -244,15 +270,67 @@ func (c *DistributionProvider) Check() error {
 //   Check() was running, AWS returned a Not Found on it (implying the
 //   Distribution has been destroyed).
 func (c *DistributionProvider) Create() error {
-	info, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
-		DistributionConfig: c.generateDistributionConfig(),
+	c.generateDistributionConfig(true)
+	_, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
+		DistributionConfig: c.DesiredState,
 	})
 
 	if err != nil {
 		return err
 	}
 
-	c.setStatus(info.Distribution)
+	c.setStatus()
 
 	return nil
+}
+
+func (c *DistributionProvider) removeCloudFrontEndpoints() {
+	var endpoints []api.Endpoint
+	for _, endpoint := range c.Status.Endpoints {
+		if endpoint.Provider != "cloudfront" {
+			endpoints = append(endpoints, endpoint)
+		}
+	}
+
+	c.Status.Endpoints = endpoints
+}
+
+func (c *DistributionProvider) Delete() error {
+	etag, err := c.load()
+	if err != nil {
+		return err
+	} else if etag == nil {
+		// If the distribution didn't exist, we don't need to do anything
+		return nil
+	}
+
+	if *c.CurrentState.DistributionConfig.Enabled {
+		// Bit of a nasty hack
+		c.DesiredState = c.CurrentState.DistributionConfig
+		c.DesiredState.SetEnabled(false)
+		_, err = c.update(etag)
+		return err
+	}
+
+	// We have to wait until the distribution is completely disabled
+	// before instructing AWS to delete it
+	if *c.CurrentState.Status == "InProgress" {
+		return nil
+	}
+
+	// We ignore the DeleteDistributionOutput because it doesn't contain
+	// anything
+	_, err = c.Client.DeleteDistribution(&cloudfront.DeleteDistributionInput{
+		Id:      c.CurrentState.Id,
+		IfMatch: etag,
+	})
+
+	if err != nil {
+		return err
+	} else {
+		c.Status.CloudFront = nil
+		c.removeCloudFrontEndpoints()
+
+		return nil
+	}
 }
