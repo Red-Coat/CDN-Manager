@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -45,6 +46,8 @@ type DistributionReconciler struct {
 	Providers      []provider.CDNProvider
 }
 
+const FINALIZER = "cdn.redcoat.dev/finalizer"
+
 //+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/finalizers,verbs=update
@@ -55,20 +58,37 @@ type DistributionReconciler struct {
 
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	distro, class := r.load(ctx, req)
-	result, newStatus := r.reconcileProviders(ctx, class, distro)
 
+	if distro.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&distro, FINALIZER) {
+			controllerutil.AddFinalizer(&distro, FINALIZER)
+			r.Update(ctx, &distro)
+		}
+
+		return r.reconcileProviders(ctx, class, distro), nil
+	} else if controllerutil.ContainsFinalizer(&distro, FINALIZER) {
+		allDeleted, result := r.deleteProviders(ctx, class, distro)
+
+		if allDeleted {
+			controllerutil.RemoveFinalizer(&distro, FINALIZER)
+			r.Update(ctx, &distro)
+		}
+
+		return result, nil
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *DistributionReconciler) updateStatus(
+	ctx context.Context,
+	newStatus api.DistributionStatus,
+	distro api.Distribution,
+) {
 	if !reflect.DeepEqual(newStatus, distro.Status) {
 		distro.Status = &newStatus
 		r.Status().Update(ctx, &distro)
 	}
-
-	// If there hasn't been an error requiring immediate requeue, but we
-	// aren't ready yet, we'll requeue in a minute
-	if !result.Requeue && !distro.Status.Ready {
-		result.RequeueAfter, _ = time.ParseDuration("1m")
-	}
-
-	return result, nil
 }
 
 // Loads a k8s Distribution and the DistributionClassSpec for its
@@ -100,19 +120,26 @@ func (r *DistributionReconciler) load(
 	}
 }
 
+func requeueIfNotReady(result *ctrl.Result, condition bool) {
+	if !result.Requeue && !condition {
+		result.RequeueAfter, _ = time.ParseDuration("1m")
+	}
+}
+
 // Loops over the Providers and asks each one to reconicle if it has
 // configuration for the distribution class
 func (r *DistributionReconciler) reconcileProviders(
 	ctx context.Context,
 	class api.DistributionClassSpec,
 	distro api.Distribution,
-) (ctrl.Result, api.DistributionStatus) {
+) ctrl.Result {
 	log := log.FromContext(ctx)
 	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 
 	if err != nil {
 		log.Error(err, "resolved", resolvedOrigin)
-		return ctrl.Result{}, api.DistributionStatus{Ready: false}
+		r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
+		return ctrl.Result{}
 	}
 
 	newStatus := api.DistributionStatus{Ready: true}
@@ -134,7 +161,46 @@ func (r *DistributionReconciler) reconcileProviders(
 		}
 	}
 
-	return result, newStatus
+	// If there hasn't been an error requiring immediate requeue, but we
+	// aren't ready yet, we'll requeue in a minute
+	requeueIfNotReady(&result, newStatus.Ready)
+
+	r.updateStatus(ctx, newStatus, distro)
+
+	return result
+}
+
+// Loops over the controllers and asks each one to delete
+func (r *DistributionReconciler) deleteProviders(
+	ctx context.Context,
+	class api.DistributionClassSpec,
+	distro api.Distribution,
+) (bool, ctrl.Result) {
+	log := log.FromContext(ctx)
+
+	var result ctrl.Result
+	newStatus := api.DistributionStatus{Ready: false}
+	allDeleted := true
+
+	for _, provider := range r.Providers {
+		if !provider.Has(*distro.Status) {
+			continue
+		}
+
+		err := provider.Delete(class, distro, &newStatus)
+
+		if err != nil {
+			result.Requeue = true
+			log.Info("Error", "error", err)
+		}
+
+		allDeleted = allDeleted && !provider.Has(newStatus)
+	}
+
+	requeueIfNotReady(&result, allDeleted)
+	r.updateStatus(ctx, newStatus, distro)
+
+	return allDeleted, result
 }
 
 func watch(
