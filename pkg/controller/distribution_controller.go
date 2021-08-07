@@ -59,19 +59,23 @@ const FINALIZER = "cdn.redcoat.dev/finalizer"
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	distro, class := r.load(ctx, req)
 
+	if distro == nil {
+		return ctrl.Result{}, nil
+	}
+
 	if distro.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&distro, FINALIZER) {
-			controllerutil.AddFinalizer(&distro, FINALIZER)
-			r.Update(ctx, &distro)
+		if !controllerutil.ContainsFinalizer(distro, FINALIZER) {
+			controllerutil.AddFinalizer(distro, FINALIZER)
+			r.Update(ctx, distro)
 		}
 
-		return r.reconcileProviders(ctx, class, distro), nil
-	} else if controllerutil.ContainsFinalizer(&distro, FINALIZER) {
-		allDeleted, result := r.deleteProviders(ctx, class, distro)
+		return r.reconcileProviders(ctx, *class, *distro), nil
+	} else if controllerutil.ContainsFinalizer(distro, FINALIZER) {
+		allDeleted, result := r.deleteProviders(ctx, *class, *distro)
 
 		if allDeleted {
-			controllerutil.RemoveFinalizer(&distro, FINALIZER)
-			r.Update(ctx, &distro)
+			controllerutil.RemoveFinalizer(distro, FINALIZER)
+			r.Update(ctx, distro)
 		}
 
 		return result, nil
@@ -100,23 +104,27 @@ func (r *DistributionReconciler) updateStatus(
 func (r *DistributionReconciler) load(
 	ctx context.Context,
 	req ctrl.Request,
-) (api.Distribution, api.DistributionClassSpec) {
+) (*api.Distribution, *api.DistributionClassSpec) {
 	var distro api.Distribution
-	r.Get(ctx, req.NamespacedName, &distro)
+	err := r.Get(ctx, req.NamespacedName, &distro)
+
+	if err != nil {
+		return nil, nil
+	}
 
 	if distro.Spec.DistributionClassRef.Kind == "ClusterDistributionClass" {
 		var parent api.ClusterDistributionClass
 		r.Get(ctx, client.ObjectKey{
 			Name: distro.Spec.DistributionClassRef.Name,
 		}, &parent)
-		return distro, parent.Spec
+		return &distro, &parent.Spec
 	} else {
 		var parent api.DistributionClass
 		r.Get(ctx, client.ObjectKey{
 			Namespace: distro.Namespace,
 			Name:      distro.Spec.DistributionClassRef.Name,
 		}, &parent)
-		return distro, parent.Spec
+		return &distro, &parent.Spec
 	}
 }
 
