@@ -157,6 +157,8 @@ type DistributionStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:JSONPath=".status.ready",name=Ready,type=boolean
+// +kubebuilder:printcolumn:JSONPath=".status.endpoints[0].host",name=Endpoint,type=string
 
 // Distribution is the Schema for the distributions API
 type Distribution struct {
