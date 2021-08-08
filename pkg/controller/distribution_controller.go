@@ -90,7 +90,7 @@ func (r *DistributionReconciler) updateStatus(
 	distro api.Distribution,
 ) {
 	if !reflect.DeepEqual(newStatus, distro.Status) {
-		distro.Status = &newStatus
+		distro.Status = newStatus
 		r.Status().Update(ctx, &distro)
 	}
 }
@@ -191,7 +191,7 @@ func (r *DistributionReconciler) deleteProviders(
 	allDeleted := true
 
 	for _, provider := range r.Providers {
-		if !provider.Has(*distro.Status) {
+		if !provider.Has(distro.Status) {
 			continue
 		}
 

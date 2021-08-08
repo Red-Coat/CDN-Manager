@@ -63,7 +63,7 @@ func (p CloudFrontProvider) Reconcile(
 		Status:       status,
 	}
 
-	if p.Has(*distro.Status) {
+	if p.Has(distro.Status) {
 		return provider.Check()
 	} else {
 		return provider.Create()
