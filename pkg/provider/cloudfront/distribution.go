@@ -271,7 +271,7 @@ func (c *DistributionProvider) Check() error {
 //   Distribution has been destroyed).
 func (c *DistributionProvider) Create() error {
 	c.generateDistributionConfig(true)
-	_, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
+	current, err := c.Client.CreateDistribution(&cloudfront.CreateDistributionInput{
 		DistributionConfig: c.DesiredState,
 	})
 
@@ -279,6 +279,7 @@ func (c *DistributionProvider) Create() error {
 		return err
 	}
 
+	c.CurrentState = current.Distribution
 	c.setStatus()
 
 	return nil
