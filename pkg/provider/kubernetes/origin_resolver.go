@@ -44,12 +44,6 @@ type ResolvedOrigin struct {
 	HTTPSPort int32
 }
 
-// Checks to see if the Origin is "complete" (ie, has all values filled
-// in)
-func (r *ResolvedOrigin) IsComplete() bool {
-	return r.Host != "" && r.HTTPPort != 0 && r.HTTPSPort != 0
-}
-
 // Checks to see if a custom hostname has been specified - if it has,
 // this takes precedence and is immediately set
 func (r *OriginResolver) resolveCustomHost() {
@@ -141,7 +135,7 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (ResolvedOrigin, error
 	resolveCustomPort(r.Origin.HTTPPort, &r.Resolved.HTTPPort)
 	resolveCustomPort(r.Origin.HTTPSPort, &r.Resolved.HTTPSPort)
 
-	if r.Resolved.IsComplete() {
+	if r.Resolved.Host != "" && r.Resolved.HTTPPort != 0 && r.Resolved.HTTPSPort != 0 {
 		return *r.Resolved, nil
 	}
 
@@ -153,8 +147,15 @@ func (r *OriginResolver) Resolve(distro api.Distribution) (ResolvedOrigin, error
 		}
 	}
 
-	if !r.Resolved.IsComplete() {
-		return *r.Resolved, fmt.Errorf("Not all information was provided")
+	if r.Resolved.HTTPPort == 0 {
+		r.Resolved.HTTPPort = 80
+	}
+	if r.Resolved.HTTPSPort == 0 {
+		r.Resolved.HTTPSPort = 443
+	}
+
+	if r.Resolved.Host == "" {
+		return *r.Resolved, fmt.Errorf("Could not determine origin hostname, please provide this")
 	}
 
 	return *r.Resolved, nil
