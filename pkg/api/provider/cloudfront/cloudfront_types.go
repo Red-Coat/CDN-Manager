@@ -47,7 +47,7 @@ type CloudFrontStatus struct {
 	// The CloudFront State as reported by the AWS API. NB: "InProgress"
 	// does not always mean the distribution is not yet available as
 	// sometimes this occurs when minor items are being updated.
-	//+kubebuilder:validation:Enum=Deployed;Disabled;InProgress
+	//+kubebuilder:validation:Enum=Deployed;Disabled;InProgress;Unknown
 	State string `json:"state"`
 
 	// The ID of the CloudFront Distribution (you can use this in any

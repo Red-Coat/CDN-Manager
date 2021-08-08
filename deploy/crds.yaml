@@ -358,6 +358,7 @@ spec:
                     - Deployed
                     - Disabled
                     - InProgress
+                    - Unknown
                     type: string
                 required:
                 - id

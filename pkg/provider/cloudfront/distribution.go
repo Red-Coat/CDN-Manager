@@ -18,6 +18,7 @@ package cloudfront
 
 import (
 	"reflect"
+	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -192,12 +193,24 @@ func (c *DistributionProvider) setStatus() {
 	c.Status.Ready = c.Status.Ready && *state.Status == "Deployed"
 }
 
+func isAwsError(err error, code string) (bool, awserr.Error) {
+	if awserr, ok := err.(awserr.Error); ok {
+		if awserr.Code() == code {
+			return true, awserr
+		} else {
+			return false, awserr
+		}
+	}
+
+	return false, nil
+}
+
 func (c *DistributionProvider) load() (*string, error) {
 	res, err := c.Client.GetDistribution(&cloudfront.GetDistributionInput{
 		Id: &c.Distribution.Status.CloudFront.ID,
 	})
 
-	if awserr, ok := err.(awserr.RequestFailure); ok && awserr.StatusCode() != 404 {
+	if is, _ := isAwsError(err, "NoSuchDistribution"); is {
 		return nil, nil
 	} else if err != nil {
 		c.useLastKnownStatus()
@@ -276,6 +289,24 @@ func (c *DistributionProvider) Create() error {
 	})
 
 	if err != nil {
+		// In the case that we get DistributionAlreadyExists, that indicates
+		// that the caller reference has already been taken.
+		// The caller reference is the k8s resource UID so it is very
+		// likely that this is the distribution that we want, but the status
+		// has been lost somehow.
+		// We'll grab the distribution id in question out of the error
+		// message and assume it is ours.
+		// We won't do any further reconcilliation at this time, as it is
+		// worth having this request requeued so that rate limiting can
+		// occur.
+		if is, awserr := isAwsError(err, "DistributionAlreadyExists"); is {
+			re := regexp.MustCompile(`[A-Z0-9]{14}`)
+			c.Status.CloudFront = &cfapi.CloudFrontStatus{
+				ID:    re.FindString(awserr.Message()),
+				State: "Unknown",
+			}
+		}
+
 		return err
 	}
 
