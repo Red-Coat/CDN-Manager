@@ -70,7 +70,7 @@ type Origin struct {
 	Target *ObjectReference `json:"targetRef"`
 
 	// +optional
-	Host string `json:"host"`
+	Host string `json:"host,omitempty"`
 
 	// The port this service uses for HTTP requests
 	// +optional
