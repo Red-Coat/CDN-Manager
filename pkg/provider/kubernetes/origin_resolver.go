@@ -134,6 +134,7 @@ func (r *OriginResolver) resolveIngress() {
 // it
 func (r *OriginResolver) Resolve(distro api.Distribution) (ResolvedOrigin, error) {
 	r.Origin = distro.Spec.Origin
+	r.Namespace = distro.Namespace
 	r.Resolved = &ResolvedOrigin{}
 
 	r.resolveCustomHost()
