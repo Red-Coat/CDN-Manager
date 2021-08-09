@@ -232,7 +232,7 @@ func watch(
 	cache func(*api.Distribution) *api.ObjectReference,
 	namespaced bool,
 ) {
-	kindName := kind.GetObjectKind().GroupVersionKind().Kind
+	kindName := reflect.TypeOf(kind).Elem().Name()
 	ctx := context.Background()
 
 	mgr.GetFieldIndexer().IndexField(ctx, &api.Distribution{}, kindName,
