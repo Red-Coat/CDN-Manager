@@ -33,7 +33,6 @@ import (
 
 	cdnv1alpha1 "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/controller"
-	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,9 +79,8 @@ func main() {
 	}
 
 	if err = (&controller.DistributionReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		OriginResolver: &kubernetes.OriginResolver{Client: mgr.GetClient()},
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Distribution")
 		os.Exit(1)

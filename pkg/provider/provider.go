@@ -51,6 +51,7 @@ type CDNProvider interface {
 		api.DistributionClassSpec,
 		api.Distribution,
 		k8s.ResolvedOrigin,
+		*k8s.Certificate,
 		*api.DistributionStatus,
 	) error
 

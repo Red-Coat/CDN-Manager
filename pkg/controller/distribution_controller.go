@@ -41,9 +41,10 @@ import (
 // DistributionReconciler reconciles a Distribution object
 type DistributionReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	OriginResolver *kubernetes.OriginResolver
-	Providers      []provider.CDNProvider
+	Scheme              *runtime.Scheme
+	OriginResolver      *kubernetes.OriginResolver
+	CertificateResolver *kubernetes.CertificateResolver
+	Providers           []provider.CDNProvider
 }
 
 const FINALIZER = "cdn.redcoat.dev/finalizer"
@@ -142,12 +143,25 @@ func (r *DistributionReconciler) reconcileProviders(
 	distro api.Distribution,
 ) ctrl.Result {
 	log := log.FromContext(ctx)
-	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 
+	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 	if err != nil {
 		log.Error(err, "Unable to resolve origin")
 		r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
 		return ctrl.Result{}
+	}
+
+	var cert *kubernetes.Certificate
+	if tls := distro.Spec.TLS; tls != nil {
+		cert, err = r.CertificateResolver.Resolve(client.ObjectKey{
+			Namespace: distro.Namespace,
+			Name:      tls.SecretRef,
+		})
+		if err != nil {
+			log.Error(err, "Unable to load certificate")
+			r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
+			return ctrl.Result{}
+		}
 	}
 
 	newStatus := api.DistributionStatus{Ready: true}
@@ -159,7 +173,7 @@ func (r *DistributionReconciler) reconcileProviders(
 			continue
 		}
 
-		err := provider.Reconcile(class, distro, resolvedOrigin, &newStatus)
+		err := provider.Reconcile(class, distro, resolvedOrigin, cert, &newStatus)
 
 		if err != nil {
 			// In the event of an error we'll requeue immediately
@@ -268,18 +282,35 @@ func getOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
 	return distro.Spec.Origin.Target
 }
 
+func getSecretRef(distro *api.Distribution) *api.ObjectReference {
+	if tlsSpec := distro.Spec.TLS; tlsSpec != nil {
+		if secret := tlsSpec.SecretRef; secret != "" {
+			return &api.ObjectReference{
+				Kind: "Secret",
+				Name: secret,
+			}
+		}
+	}
+
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
 	watch(builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
 	watch(builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
+	watch(builder, mgr, &corev1.Secret{}, getSecretRef, true)
 	watch(builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
 	watch(builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
 
 	r.Providers = []provider.CDNProvider{
 		cloudfront.CloudFrontProvider{},
 	}
+
+	r.OriginResolver = &kubernetes.OriginResolver{Client: mgr.GetClient()}
+	r.CertificateResolver = &kubernetes.CertificateResolver{Client: mgr.GetClient()}
 
 	return builder.Complete(r)
 }

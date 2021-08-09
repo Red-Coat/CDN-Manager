@@ -54,6 +54,7 @@ func (p CloudFrontProvider) Reconcile(
 	class api.DistributionClassSpec,
 	distro api.Distribution,
 	origin kubernetes.ResolvedOrigin,
+	cert *kubernetes.Certificate,
 	status *api.DistributionStatus,
 ) error {
 	provider := DistributionProvider{
