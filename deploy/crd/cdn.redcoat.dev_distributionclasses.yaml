@@ -51,6 +51,13 @@ spec:
                           If not set we fall-back to using env vars, shared credentials
                           file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
                         type: string
+                      dedicatedIP:
+                        default: false
+                        description: Set this true if you need to request a dedicated
+                          IP address for your distribution in order to support legacy
+                          (non-SNI) clients. Warning, this will incurr high costs
+                          from AWS!
+                        type: boolean
                       secretAccessKeySecretRef:
                         description: The SecretAccessKey is used for authentication.
                           If not set we fall-back to using env vars, shared credentials

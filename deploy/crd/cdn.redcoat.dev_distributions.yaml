@@ -122,13 +122,6 @@ spec:
               tls:
                 description: Optionally you can support TLS on your distribution
                 properties:
-                  dedicatedIP:
-                    default: false
-                    description: Set this true if you need to request a dedicated
-                      IP address for your distribution in order to support legacy
-                      (non-SNI) clients. Warning, this may incurr high costs from
-                      many providers!
-                    type: boolean
                   mode:
                     default: redirect
                     description: 'Sets how TLS is handled by the distribution: Redirect
@@ -144,7 +137,6 @@ spec:
                     description: The name of the secret containing the tls certificate
                     type: string
                 required:
-                - dedicatedIP
                 - mode
                 - secretName
                 type: object

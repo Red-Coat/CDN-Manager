@@ -38,6 +38,13 @@ type CloudFrontSpec struct {
 	// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
 	// +optional
 	SecretAccessKey *cmmeta.SecretKeySelector `json:"secretAccessKeySecretRef"`
+
+	// Set this true if you need to request a dedicated IP address for
+	// your distribution in order to support legacy (non-SNI) clients.
+	// Warning, this will incurr high costs from AWS!
+	// +kubebuilder:default=false
+	// +optional
+	DedicatedIP bool `json:"dedicatedIP"`
 }
 
 // The status of a CloudFront Distribution, if one was requested by the

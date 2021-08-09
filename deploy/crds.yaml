@@ -52,6 +52,13 @@ spec:
                           If not set we fall-back to using env vars, shared credentials
                           file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
                         type: string
+                      dedicatedIP:
+                        default: false
+                        description: Set this true if you need to request a dedicated
+                          IP address for your distribution in order to support legacy
+                          (non-SNI) clients. Warning, this will incurr high costs
+                          from AWS!
+                        type: boolean
                       secretAccessKeySecretRef:
                         description: The SecretAccessKey is used for authentication.
                           If not set we fall-back to using env vars, shared credentials
@@ -147,6 +154,13 @@ spec:
                           If not set we fall-back to using env vars, shared credentials
                           file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
                         type: string
+                      dedicatedIP:
+                        default: false
+                        description: Set this true if you need to request a dedicated
+                          IP address for your distribution in order to support legacy
+                          (non-SNI) clients. Warning, this will incurr high costs
+                          from AWS!
+                        type: boolean
                       secretAccessKeySecretRef:
                         description: The SecretAccessKey is used for authentication.
                           If not set we fall-back to using env vars, shared credentials
@@ -313,13 +327,6 @@ spec:
               tls:
                 description: Optionally you can support TLS on your distribution
                 properties:
-                  dedicatedIP:
-                    default: false
-                    description: Set this true if you need to request a dedicated
-                      IP address for your distribution in order to support legacy
-                      (non-SNI) clients. Warning, this may incurr high costs from
-                      many providers!
-                    type: boolean
                   mode:
                     default: redirect
                     description: 'Sets how TLS is handled by the distribution: Redirect
@@ -335,7 +342,6 @@ spec:
                     description: The name of the secret containing the tls certificate
                     type: string
                 required:
-                - dedicatedIP
                 - mode
                 - secretName
                 type: object

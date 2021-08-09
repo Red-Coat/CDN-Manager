@@ -42,12 +42,6 @@ type TLSSpec struct {
 
 	// The name of the secret containing the tls certificate
 	SecretRef string `json:"secretName"`
-
-	// Set this true if you need to request a dedicated IP address for
-	// your distribution in order to support legacy (non-SNI) clients.
-	// Warning, this may incurr high costs from many providers!
-	// +kubebuilder:default=false
-	DedicatedIP bool `json:"dedicatedIP"`
 }
 
 // Used to represent a port on a service. Either name or number must be
