@@ -164,7 +164,8 @@ func (r *DistributionReconciler) reconcileProviders(
 		}
 	}
 
-	newStatus := api.DistributionStatus{Ready: true}
+	newStatus := distro.Status.DeepCopy()
+	newStatus.Ready = true
 
 	var result ctrl.Result
 
@@ -173,7 +174,7 @@ func (r *DistributionReconciler) reconcileProviders(
 			continue
 		}
 
-		err := provider.Reconcile(class, distro, resolvedOrigin, cert, &newStatus)
+		err := provider.Reconcile(class, distro, resolvedOrigin, cert, newStatus)
 
 		if err != nil {
 			// In the event of an error we'll requeue immediately
@@ -187,7 +188,7 @@ func (r *DistributionReconciler) reconcileProviders(
 	// aren't ready yet, we'll requeue in a minute
 	requeueIfNotReady(&result, newStatus.Ready)
 
-	r.updateStatus(ctx, newStatus, distro)
+	r.updateStatus(ctx, *newStatus, distro)
 
 	return result
 }
@@ -201,7 +202,8 @@ func (r *DistributionReconciler) deleteProviders(
 	log := log.FromContext(ctx)
 
 	var result ctrl.Result
-	newStatus := api.DistributionStatus{Ready: false}
+	newStatus := distro.Status.DeepCopy()
+	newStatus.Ready = false
 	allDeleted := true
 
 	for _, provider := range r.Providers {
@@ -209,18 +211,18 @@ func (r *DistributionReconciler) deleteProviders(
 			continue
 		}
 
-		err := provider.Delete(class, distro, &newStatus)
+		err := provider.Delete(class, distro, newStatus)
 
 		if err != nil {
 			result.Requeue = true
 			log.Info("Error", "error", err)
 		}
 
-		allDeleted = allDeleted && !provider.Has(newStatus)
+		allDeleted = allDeleted && !provider.Has(*newStatus)
 	}
 
 	requeueIfNotReady(&result, allDeleted)
-	r.updateStatus(ctx, newStatus, distro)
+	r.updateStatus(ctx, *newStatus, distro)
 
 	return allDeleted, result
 }

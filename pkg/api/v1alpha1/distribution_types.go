@@ -146,7 +146,7 @@ type DistributionStatus struct {
 	Endpoints []Endpoint `json:"endpoints"`
 
 	//+optional
-	CloudFront *cloudfront.CloudFrontStatus `json:"cloudfront,omitempty"`
+	CloudFront cloudfront.CloudFrontStatus `json:"cloudfront,omitempty"`
 }
 
 //+kubebuilder:object:root=true

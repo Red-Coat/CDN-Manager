@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
-	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
 )
@@ -182,10 +181,9 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 // Sets the Status based on the Status returned by the AWS API
 func (c *DistributionProvider) setStatus() {
 	state := c.CurrentState
-	c.Status.CloudFront = &cfapi.CloudFrontStatus{
-		State: *state.Status,
-		ID:    *state.Id,
-	}
+	c.Status.CloudFront.State = *state.Status
+	c.Status.CloudFront.ID = *state.Id
+	c.removeCloudFrontEndpoints()
 	c.Status.Endpoints = append(c.Status.Endpoints, api.Endpoint{
 		Provider: "cloudfront",
 		Host:     *state.DomainName,
@@ -211,24 +209,15 @@ func (c *DistributionProvider) load() (*string, error) {
 	})
 
 	if is, _ := isAwsError(err, "NoSuchDistribution"); is {
+		c.Status.CloudFront.ID = ""
+		c.removeCloudFrontEndpoints()
 		return nil, nil
 	} else if err != nil {
-		c.useLastKnownStatus()
 		return nil, err
 	} else {
 		c.CurrentState = res.Distribution
 		c.setStatus()
 		return res.ETag, nil
-	}
-}
-
-func (c *DistributionProvider) useLastKnownStatus() {
-	c.Status.CloudFront = c.Distribution.Status.CloudFront
-	for _, endpoint := range c.Distribution.Status.Endpoints {
-		if endpoint.Provider == "cloudfront" {
-			c.Status.Endpoints = append(c.Status.Endpoints, endpoint)
-			break
-		}
 	}
 }
 
@@ -240,12 +229,19 @@ func (c *DistributionProvider) update(etag *string) (*string, error) {
 	})
 
 	if err != nil {
-		c.useLastKnownStatus()
 		return nil, err
 	} else {
 		c.CurrentState = res.Distribution
 		c.setStatus()
 		return res.ETag, nil
+	}
+}
+
+func (c *DistributionProvider) Reconcile() error {
+	if c.Distribution.Status.CloudFront.ID != "" {
+		return c.Check()
+	} else {
+		return c.Create()
 	}
 }
 
@@ -301,10 +297,8 @@ func (c *DistributionProvider) Create() error {
 		// occur.
 		if is, awserr := isAwsError(err, "DistributionAlreadyExists"); is {
 			re := regexp.MustCompile(`[A-Z0-9]{14}`)
-			c.Status.CloudFront = &cfapi.CloudFrontStatus{
-				ID:    re.FindString(awserr.Message()),
-				State: "Unknown",
-			}
+			c.Status.CloudFront.ID = re.FindString(awserr.Message())
+			c.Status.CloudFront.State = "Unknown"
 		}
 
 		return err
@@ -360,7 +354,7 @@ func (c *DistributionProvider) Delete() error {
 	if err != nil {
 		return err
 	} else {
-		c.Status.CloudFront = nil
+		c.Status.CloudFront.ID = ""
 		c.removeCloudFrontEndpoints()
 
 		return nil

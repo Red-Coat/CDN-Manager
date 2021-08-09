@@ -30,7 +30,7 @@ type CloudFrontProvider struct {
 }
 
 func (p CloudFrontProvider) Has(status api.DistributionStatus) bool {
-	return status.CloudFront != nil
+	return status.CloudFront.ID != ""
 }
 
 func (p CloudFrontProvider) Wants(class api.DistributionClassSpec) bool {
@@ -64,11 +64,7 @@ func (p CloudFrontProvider) Reconcile(
 		Status:       status,
 	}
 
-	if p.Has(distro.Status) {
-		return provider.Check()
-	} else {
-		return provider.Create()
-	}
+	return provider.Reconcile()
 }
 
 func (p CloudFrontProvider) Delete(
