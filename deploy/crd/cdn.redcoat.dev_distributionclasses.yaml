@@ -51,6 +51,14 @@ spec:
                           If not set we fall-back to using env vars, shared credentials
                           file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
                         type: string
+                      cachePolicyId:
+                        description: The Policy ID of the CloudFront Cache Policy
+                          you want to use on distributions
+                        type: string
+                      originRequestPolicyId:
+                        description: The Policy ID of the CloudFront Origin Request
+                          Policy you want to use on distributions
+                        type: string
                       secretAccessKeySecretRef:
                         description: The SecretAccessKey is used for authentication.
                           If not set we fall-back to using env vars, shared credentials
@@ -79,6 +87,9 @@ spec:
                         - vpi
                         - static-ip
                         type: string
+                    required:
+                    - cachePolicyId
+                    - originRequestPolicyId
                     type: object
                 type: object
             required:

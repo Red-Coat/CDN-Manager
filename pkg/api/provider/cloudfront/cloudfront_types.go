@@ -46,6 +46,14 @@ type CloudFrontSpec struct {
 	// +kubebuilder:validation:Enum=sni-only;vpi;static-ip
 	// +optional
 	SSLMode string `json:"sslMode"`
+
+	// The Policy ID of the CloudFront Cache Policy you want to use on
+	// distributions
+	CachePolicyId string `json:"cachePolicyId"`
+
+	// The Policy ID of the CloudFront Origin Request Policy you want to
+	// use on distributions
+	OriginRequestPolicyId string `json:"originRequestPolicyId"`
 }
 
 // The status of a CloudFront Distribution, if one was requested by the

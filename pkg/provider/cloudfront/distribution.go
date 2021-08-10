@@ -180,8 +180,8 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 			TargetOriginId:        aws.String(c.Origin.Host),
 			ViewerProtocolPolicy:  aws.String(c.calculateViewerPolicy()),
 			Compress:              aws.Bool(true),
-			CachePolicyId:         aws.String("658327ea-f89d-4fab-a63d-7e88639e58f6"),
-			OriginRequestPolicyId: aws.String("216adef6-5c7f-47e4-b989-5492eafa07d3"),
+			CachePolicyId:         aws.String(c.Class.CachePolicyId),
+			OriginRequestPolicyId: aws.String(c.Class.OriginRequestPolicyId),
 			// Required By AWS
 			SmoothStreaming:        aws.Bool(false),
 			FieldLevelEncryptionId: aws.String(""),
