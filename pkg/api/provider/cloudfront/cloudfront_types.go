@@ -60,4 +60,7 @@ type CloudFrontStatus struct {
 	// The ID of the CloudFront Distribution (you can use this in any
 	// interaction with the aws cloudfront api).
 	ID string `json:"id"`
+
+	// The ARN of the ACM Certificate created for the distribution
+	CertificateArn string `json:"certificateArn"`
 }

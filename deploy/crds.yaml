@@ -358,6 +358,9 @@ spec:
                 description: The status of a CloudFront Distribution, if one was requested
                   by the DistributionClass
                 properties:
+                  certificateArn:
+                    description: The ARN of the ACM Certificate created for the distribution
+                    type: string
                   id:
                     description: The ID of the CloudFront Distribution (you can use
                       this in any interaction with the aws cloudfront api).
@@ -374,6 +377,7 @@ spec:
                     - Unknown
                     type: string
                 required:
+                - certificateArn
                 - id
                 - state
                 type: object

@@ -19,6 +19,7 @@ package cloudfront
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
@@ -37,15 +38,14 @@ func (p CloudFrontProvider) Wants(class api.DistributionClassSpec) bool {
 	return class.Providers.CloudFront != nil
 }
 
-func (p CloudFrontProvider) getClient(class api.DistributionClassSpec) *cloudfront.CloudFront {
+func (p CloudFrontProvider) getSession(class api.DistributionClassSpec) *session.Session {
 	config := aws.NewConfig()
 	sessionOpts := session.Options{
 		Config: *config,
 	}
 	sess, _ := session.NewSessionWithOptions(sessionOpts)
-	client := cloudfront.New(sess)
 
-	return client
+	return sess
 }
 
 // Creates a new CloudFront Provider from the given Distribution and
@@ -57,14 +57,31 @@ func (p CloudFrontProvider) Reconcile(
 	cert *kubernetes.Certificate,
 	status *api.DistributionStatus,
 ) error {
-	provider := DistributionProvider{
-		Client:       p.getClient(class),
+	sess := p.getSession(class)
+
+	acm := CertificateProvider{
+		// ACM certs must always be in us-east-1 for Cloudfront so we
+		// override the region here
+		Client: acm.New(sess, &aws.Config{
+			Region: aws.String("us-east-1"),
+		}),
+		Certificate: cert,
+		Status:      status,
+	}
+
+	err := acm.Reconcile()
+	if err != nil {
+		return err
+	}
+
+	cloudfront := DistributionProvider{
+		Client:       cloudfront.New(sess),
 		Distribution: distro,
 		Origin:       origin,
 		Status:       status,
 	}
 
-	return provider.Reconcile()
+	return cloudfront.Reconcile()
 }
 
 func (p CloudFrontProvider) Delete(
@@ -72,8 +89,9 @@ func (p CloudFrontProvider) Delete(
 	distro api.Distribution,
 	status *api.DistributionStatus,
 ) error {
+	sess := p.getSession(class)
 	provider := DistributionProvider{
-		Client:       p.getClient(class),
+		Client:       cloudfront.New(sess),
 		Distribution: distro,
 		Status:       status,
 	}

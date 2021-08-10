@@ -33,33 +33,23 @@ type CertificateResolver struct {
 	resolved *Certificate
 }
 
-// Generic Wrapper for the Private key - we use this because the private
-// key parsing code returns various unrelated structs depending on the
-// key type
-type PrivateKey struct {
-	// The raw ASN.1 DER contents of the certificate
-	Raw []byte
+// Holds the Original and Parsed representations of the certificate
+type CertificateWrapper struct {
+	Encoded []byte
 
-	// The parsed certificate. One of:
-	// - rsa.PrivateKey
-	// - ecdsa.PrivateKey
-	// - ed25519.PrivateKey
-	//
-	// These do not share any common interfaces, so we have to just type
-	// this as a generic interface{}
-	Parsed interface{}
+	Parsed *x509.Certificate
 }
 
 // Holds a complete loaded and parsed certificate
 type Certificate struct {
 	// The certificate on its own
-	Certificate *x509.Certificate
+	Certificate CertificateWrapper
 
 	// Any certificates up the certification path for this certificate
-	Chain []*x509.Certificate
+	Chain []byte
 
 	// The private key for this certificate
-	Key PrivateKey
+	Key []byte
 }
 
 // Loads the the secret given and parses it as a
@@ -118,21 +108,15 @@ func (c *CertificateResolver) parseCrt() error {
 		return err
 	}
 
-	for len(raw) > 0 {
-		var block *pem.Block
-		block, raw = pem.Decode(raw)
-		cert, err := x509.ParseCertificate(block.Bytes)
-
-		if err != nil {
-			return err
-		} else if c.resolved.Certificate == nil {
-			c.resolved.Certificate = cert
-		} else {
-			c.resolved.Chain = append(c.resolved.Chain, cert)
-		}
+	block, rest := pem.Decode(raw)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	c.resolved.Certificate = CertificateWrapper{
+		Encoded: raw[:len(raw)-len(rest)],
+		Parsed:  cert,
 	}
+	c.resolved.Chain = rest
 
-	return nil
+	return err
 }
 
 // Loads the tls.eky section of the secret and parses it into the
@@ -143,22 +127,15 @@ func (c *CertificateResolver) parseKey() error {
 		return err
 	}
 
-	block, _ := pem.Decode(key)
-	c.resolved.Key.Raw = block.Bytes
+	block, rest := pem.Decode(key)
+	c.resolved.Key = key[:len(key)-len(rest)]
 
-	if block.Type == "RSA PRIVATE KEY" {
-		c.resolved.Key.Parsed, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	} else if block.Type == "PRIVATE KEY" {
-		c.resolved.Key.Parsed, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	} else {
+	if block.Type != "RSA PRIVATE KEY" && block.Type != "PRIVATE KEY" {
 		return fmt.Errorf(
 			"TLS secret \"%v\"'s private key was invalid",
 			c.secret.Name,
 		)
 	}
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
