@@ -19,9 +19,10 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Represents a type of distribution scheme, to one or more cdn
-          providers. This resource is cluster wide, so can be referenced by distributions
-          in any namespace.
+        description: A DistributionClass represents a cluster-scoped configuration
+          for a third party Content Delivery Network / Edge Cache (eg CloudFront).
+          This holds generic configuration about a CDN integration, such as access
+          tokens, or other CDN-specific configurations.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -36,16 +37,19 @@ spec:
           metadata:
             type: object
           spec:
-            description: Desired state of the DistributionClass Resource
+            description: Configuration for the DistributionClass resource
             properties:
               providers:
                 description: List of one or more providers to deploy Distributions
                   to. At least one must be provided
                 properties:
                   cloudfront:
-                    description: The access details for cloudfront distributions If
-                      this section is provided, a cloudfront distribution will be
-                      setup, even if access details are not given in this block.
+                    description: If this block exists, Distributions referencing this
+                      DistributionClass will be setup in CloudFront. You can specify
+                      an Access Key and Secret key in this block, or authorize the
+                      pod directly by setting the AWS_ACCESS_KEY_ID / AWS_ACCESS_KEY_ID
+                      environment variables, or using AWS' IAM Roles For Service Accounts
+                      (IRSA) Controller.
                     properties:
                       accessKeyID:
                         description: 'The AccessKeyID is used for authentication.
@@ -95,15 +99,6 @@ spec:
                 type: object
             required:
             - providers
-            type: object
-          status:
-            description: The current state of the DistributionClass Resource
-            properties:
-              ready:
-                description: Currently unused, this exists for possible future usage
-                type: boolean
-            required:
-            - ready
             type: object
         type: object
     served: true

@@ -26,7 +26,11 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Distribution is the Schema for the distributions API
+        description: A distribution resource should be created to ensure an up to
+          date Distribution is setup. If targetted at a service or ingress, the Distribution
+          will be kept up to date with its external ingress address. The Distribution
+          will also keep up to date with any changes or renewals made the TLS certificate
+          secret it is given.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -48,7 +52,7 @@ spec:
                   this distribution
                 properties:
                   kind:
-                    description: The kind of resource to target (Ingress or Service)
+                    description: The kind of resource to target
                     type: string
                   name:
                     description: The name of the resource to target. This must be
@@ -59,34 +63,59 @@ spec:
                 - name
                 type: object
               hosts:
-                description: The hostnames that this distribution will listen for
+                description: 'The list of host names that this distribition is for,
+                  following the same rules as the host field of an IngressRule, namely
+                  that it is a fully qualified domain name, as defined by RFC 3986
+                  with two exceptions: 1. IP address are not allowed. Content Delivery
+                  Networks and edge caches manage their own IP addresses, and listening
+                  on these specifically neither makes sense, or is allowed by providers.
+                  2. The `:` delimeter is not allowed. Most CDNs always use port 80
+                  for HTTP and 443 for HTTPS and these are not configurable. If you
+                  are using TLS, each of these host names _must_ exist within the
+                  given certificate. Warning: If you are using CloudFront, you must
+                  also specify a TLS certificate if you give a list of hosts.'
                 items:
                   type: string
                 type: array
               origin:
-                description: Information about the origin for the distribution
+                description: Information about the "Origin" for the distribution,
+                  ie where the CDN should be setup to point to. We would normally
+                  expect this to be this kubernetes cluster, although it does not
+                  have to be.
                 properties:
                   host:
+                    description: If you specify this, this takes precendence over
+                      any detected ingress load balancer hostnames. Use this to override
+                      the target's hostname, or if you have not specified a kubernetes
+                      target.
                     type: string
                   httpPort:
-                    description: The port this service uses for HTTP requests
+                    description: The port to target for HTTP requests. If not given,
+                      this defaults to 80.
                     properties:
                       name:
-                        description: The name of the port on the service
+                        description: If targetting a service, this is the named port
+                          on that Service resource. This is a mutually exclusive setting
+                          with "Number".
                         type: string
                       number:
-                        description: The port number on the service
+                        description: The numerical port number (e.g. 80) to target.
+                          This is a mutally exclusive setting with "Name".
                         format: int32
                         type: integer
                     type: object
                   httpsPort:
-                    description: The port this service uses for HTTPS requests
+                    description: The port to target for HTTPS requests. If not given,
+                      this defaults to 443.
                     properties:
                       name:
-                        description: The name of the port on the service
+                        description: If targetting a service, this is the named port
+                          on that Service resource. This is a mutually exclusive setting
+                          with "Number".
                         type: string
                       number:
-                        description: The port number on the service
+                        description: The numerical port number (e.g. 80) to target.
+                          This is a mutally exclusive setting with "Name".
                         format: int32
                         type: integer
                     type: object
@@ -96,7 +125,7 @@ spec:
                       will point to that service's ingress load balancer.
                     properties:
                       kind:
-                        description: The kind of resource to target (Ingress or Service)
+                        description: The kind of resource to target
                         type: string
                       name:
                         description: The name of the resource to target. This must
@@ -120,21 +149,26 @@ spec:
                   type: string
                 type: array
               tls:
-                description: Optionally you can support TLS on your distribution
+                description: The TLS configuration for this distribution (eg the secret
+                  name for the TLS certificate, and how to handle insecure requests).
                 properties:
                   mode:
                     default: redirect
                     description: 'Sets how TLS is handled by the distribution: Redirect
-                      (default) causes HTTP requests to be redirected to HTTPS Only
-                      causes HTTP requests to be dropped Both causes both HTTP and
-                      HTTPs requests to be respected'
+                      (default) causes HTTP requests to be redirected to HTTPS, Only
+                      causes HTTP requests to be dropped, Both causes both HTTP and
+                      HTTPs requests to be respected. NB: Different cloud providers
+                      may vary in the way they interpret or respect this directive.'
                     enum:
                     - redirect
                     - only
                     - both
                     type: string
                   secretName:
-                    description: The name of the secret containing the tls certificate
+                    description: The name of the kubernetes secret containing the
+                      TLS certificate to be used by the distribution. This should
+                      be of type kubernetes.io/tls and have the required fields (tls.crt
+                      and tls.key). Other fields are ignored.
                     type: string
                 required:
                 - mode
@@ -150,8 +184,8 @@ spec:
             description: The current State of the Distribution
             properties:
               cloudfront:
-                description: The status of a CloudFront Distribution, if one was requested
-                  by the DistributionClass
+                description: Information about the state of the CloudFront distribution
+                  and associated resources.
                 properties:
                   certificateArn:
                     description: The ARN of the ACM Certificate created for the distribution
@@ -192,15 +226,18 @@ spec:
                     host: lb-4-5-6-7.provider.example.com"
                   properties:
                     host:
-                      description: A hostname that the distribution is available at
+                      description: A hostname that the distribution is available at.
+                        This is what you would use in an DNS CNAME record. At least
+                        one of "Host" and "IP" must be set for each Endpoint.
                       type: string
                     ip:
                       description: An IP address that the distribution is available
-                        at
+                        at. This is what you would use in a DNS A or AAAA record.
+                        At least one of "Host" and "IP" must be set for each Endpoint.
                       type: string
                     provider:
                       description: The name of the provider that is responsible for
-                        this endpoint (eg "cloudfront")
+                        this endpoint (eg "cloudfront").
                       type: string
                   required:
                   - provider

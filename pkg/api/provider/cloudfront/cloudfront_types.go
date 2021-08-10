@@ -23,7 +23,7 @@ import (
 // The access details for cloudfront distributions
 // If this section is provided, a cloudfront distribution will be setup,
 // even if access details are not given in this block.
-//+kubebuilder:object:generate=true
+// +kubebuilder:object:generate=true
 type CloudFrontSpec struct {
 	// The AccessKeyID is used for authentication.
 	// If not set we fall-back to using env vars, shared credentials file
@@ -58,7 +58,7 @@ type CloudFrontSpec struct {
 
 // The status of a CloudFront Distribution, if one was requested by the
 // DistributionClass
-//+kubebuilder:object:generate=true
+// +kubebuilder:object:generate=true
 type CloudFrontStatus struct {
 	// The CloudFront State as reported by the AWS API. NB: "InProgress"
 	// does not always mean the distribution is not yet available as

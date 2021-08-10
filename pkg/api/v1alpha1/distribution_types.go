@@ -21,58 +21,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type ObjectReference struct {
-	// The kind of resource to target (Ingress or Service)
-	// +kubebuilder:validation=Ingress;Service
-	Kind string `json:"kind"`
-
-	// The name of the resource to target. This must be in the same
-	// namespace as the Distribution resource.
-	Name string `json:"name"`
+func init() {
+	SchemeBuilder.Register(&Distribution{}, &DistributionList{})
 }
 
-type TLSSpec struct {
-	// Sets how TLS is handled by the distribution:
-	// Redirect (default) causes HTTP requests to be redirected to HTTPS
-	// Only causes HTTP requests to be dropped
-	// Both causes both HTTP and HTTPs requests to be respected
-	// +kubebuilder:validation:Enum=redirect;only;both
-	// +kubebuilder:default=redirect
-	Mode string `json:"mode"`
+// A distribution resource should be created to ensure an up to date
+// Distribution is setup. If targetted at a service or ingress, the
+// Distribution will be kept up to date with its external ingress
+// address. The Distribution will also keep up to date with any changes
+// or renewals made the TLS certificate secret it is given.
+//
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:JSONPath=".status.ready",name=Ready,type=boolean
+// +kubebuilder:printcolumn:JSONPath=".status.endpoints[0].host",name=Endpoint,type=string
+type Distribution struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// The name of the secret containing the tls certificate
-	SecretRef string `json:"secretName"`
-}
-
-// Used to represent a port on a service. Either name or number must be
-// specified
-type ServicePort struct {
-	// The name of the port on the service
-	// +optional
-	Name string `json:"name"`
-
-	// The port number on the service
-	// +optional
-	Number int32 `json:"number"`
-}
-
-type Origin struct {
-	// If you want to target another Resource in the cluster (eg a Service
-	// or an Ingress) specify it here. The Distribution will point to that
-	// service's ingress load balancer.
-	// +optional
-	Target *ObjectReference `json:"targetRef"`
+	Spec DistributionSpec `json:"spec"`
 
 	// +optional
-	Host string `json:"host,omitempty"`
-
-	// The port this service uses for HTTP requests
-	// +optional
-	HTTPPort *ServicePort `json:"httpPort"`
-
-	// The port this service uses for HTTPS requests
-	// +optional
-	HTTPSPort *ServicePort `json:"httpsPort"`
+	Status DistributionStatus `json:"status"`
 }
 
 // The desired state of the Distribution
@@ -92,15 +62,104 @@ type DistributionSpec struct {
 	// or DELETE, all methods are enabled.
 	SupportedMethods []string `json:"supportedMethods"`
 
-	// Information about the origin for the distribution
+	// Information about the "Origin" for the distribution, ie where the CDN
+	// should be setup to point to. We would normally expect this to be this
+	// kubernetes cluster, although it does not have to be.
 	Origin Origin `json:"origin"`
 
-	// The hostnames that this distribution will listen for
+	// The list of host names that this distribition is for, following the
+	// same rules as the host field of an IngressRule, namely that it is a
+	// fully qualified domain name, as defined by RFC 3986 with two
+	// exceptions: 1. IP address are not allowed. Content Delivery
+	// Networks and edge caches manage their own IP addresses, and
+	// listening on these specifically neither makes sense, or is allowed
+	// by providers. 2. The `:` delimeter is not allowed. Most CDNs always
+	// use port 80 for HTTP and 443 for HTTPS and these are not
+	// configurable. If you are using TLS, each of these host names _must_
+	// exist within the given certificate. Warning: If you are using
+	// CloudFront, you must also specify a TLS certificate if you give a
+	// list of hosts.
 	Hosts []string `json:"hosts"`
 
-	// Optionally you can support TLS on your distribution
+	// The TLS configuration for this distribution (eg the secret name for
+	// the TLS certificate, and how to handle insecure requests).
 	// +optional
 	TLS *TLSSpec `json:"tls"`
+}
+
+// Options for the "origin" of the distribition - ie where the CDN
+// points to.
+type Origin struct {
+	// If you want to target another Resource in the cluster (eg a Service
+	// or an Ingress) specify it here. The Distribution will point to that
+	// service's ingress load balancer.
+	// +optional
+	Target *ObjectReference `json:"targetRef"`
+
+	// If you specify this, this takes precendence over any detected
+	// ingress load balancer hostnames. Use this to override the target's
+	// hostname, or if you have not specified a kubernetes target.
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// The port to target for HTTP requests. If not given, this defaults
+	// to 80.
+	// +optional
+	HTTPPort *ServicePort `json:"httpPort"`
+
+	// The port to target for HTTPS requests. If not given, this defaults
+	// to 443.
+	// +optional
+	HTTPSPort *ServicePort `json:"httpsPort"`
+}
+
+// Options to control the way TLS works within this distribution
+type TLSSpec struct {
+	// Sets how TLS is handled by the distribution:
+	// Redirect (default) causes HTTP requests to be redirected to HTTPS,
+	// Only causes HTTP requests to be dropped,
+	// Both causes both HTTP and HTTPs requests to be respected.
+	// NB: Different cloud providers may vary in the way they interpret
+	// or respect this directive.
+	// +kubebuilder:validation:Enum=redirect;only;both
+	// +kubebuilder:default=redirect
+	Mode string `json:"mode"`
+
+	// The name of the kubernetes secret containing the TLS certificate
+	// to be used by the distribution. This should be of type
+	// kubernetes.io/tls and have the required fields (tls.crt and
+	// tls.key). Other fields are ignored.
+	SecretRef string `json:"secretName"`
+}
+
+// Used to represent a port on a service. Either name or number must be
+// specified
+type ServicePort struct {
+	// If targetting a service, this is the named port on that Service
+	// resource. This is a mutually exclusive setting with "Number".
+	// +optional
+	Name string `json:"name"`
+
+	// The numerical port number (e.g. 80) to target. This is a mutally
+	// exclusive setting with "Name".
+	// +optional
+	Number int32 `json:"number"`
+}
+
+// The current State of the Distribution
+type DistributionStatus struct {
+	Ready bool `json:"ready"`
+
+	// List of one or more "endpoints" for the deployed distribution.
+	// These can be either hostnames for DNS CNAMING, or direct IP
+	// addresses, depending on the provider.
+	//+optional
+	Endpoints []Endpoint `json:"endpoints"`
+
+	// Information about the state of the CloudFront distribution and
+	// associated resources.
+	//+optional
+	CloudFront cloudfront.CloudFrontStatus `json:"cloudfront,omitempty"`
 }
 
 // Information about a specific Endpoint
@@ -123,57 +182,26 @@ type DistributionSpec struct {
 // - host: lb-4-5-6-7.provider.example.com
 type Endpoint struct {
 	// The name of the provider that is responsible for this endpoint
-	// (eg "cloudfront")
+	// (eg "cloudfront").
 	Provider string `json:"provider"`
 
-	// A hostname that the distribution is available at
+	// A hostname that the distribution is available at. This is what you
+	// would use in an DNS CNAME record. At least one of "Host" and "IP"
+	// must be set for each Endpoint.
 	// +optional
 	Host string `json:"host,omitempty"`
 
-	// An IP address that the distribution is available at
+	// An IP address that the distribution is available at. This is what
+	// you would use in a DNS A or AAAA record. At least one of "Host" and
+	// "IP" must be set for each Endpoint.
 	// +optional
 	IP string `json:"ip,omitempty"`
 }
 
-// The current State of the Distribution
-type DistributionStatus struct {
-	Ready bool `json:"ready"`
-
-	// List of one or more "endpoints" for the deployed distribution.
-	// These can be either hostnames for DNS CNAMING, or direct IP
-	// addresses, depending on the provider.
-	//+optional
-	Endpoints []Endpoint `json:"endpoints"`
-
-	//+optional
-	CloudFront cloudfront.CloudFrontStatus `json:"cloudfront,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-// +kubebuilder:printcolumn:JSONPath=".status.ready",name=Ready,type=boolean
-// +kubebuilder:printcolumn:JSONPath=".status.endpoints[0].host",name=Endpoint,type=string
-
-// Distribution is the Schema for the distributions API
-type Distribution struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec DistributionSpec `json:"spec"`
-
-	// +optional
-	Status DistributionStatus `json:"status"`
-}
-
-//+kubebuilder:object:root=true
-
-// DistributionList contains a list of Distribution
+// DistributionList contains a list of Distributions
+// +kubebuilder:object:root=true
 type DistributionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Distribution `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Distribution{}, &DistributionList{})
 }

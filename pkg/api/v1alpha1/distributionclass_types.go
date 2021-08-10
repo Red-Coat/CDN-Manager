@@ -21,71 +21,70 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type ProviderList struct {
-	// +optional
-	CloudFront *cloudfront.CloudFrontSpec `json:"cloudfront,omitempty"`
+func init() {
+	SchemeBuilder.Register(&DistributionClass{}, &DistributionClassList{})
+	SchemeBuilder.Register(&ClusterDistributionClass{}, &ClusterDistributionClassList{})
 }
 
-// Desired state of the DistributionClass Resource
+// A DistributionClass represents a namespaced-scoped configuration for
+// a third party Content Delivery Network / Edge Cache (eg CloudFront).
+// This holds generic configuration about a CDN integration, such as
+// access tokens, or other CDN-specific configurations.
+//
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+type DistributionClass struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec DistributionClassSpec `json:"spec,omitempty"`
+}
+
+// A DistributionClass represents a cluster-scoped configuration for
+// a third party Content Delivery Network / Edge Cache (eg CloudFront).
+// This holds generic configuration about a CDN integration, such as
+// access tokens, or other CDN-specific configurations.
+//
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
+type ClusterDistributionClass struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec DistributionClassSpec `json:"spec,omitempty"`
+}
+
+// Configuration for the DistributionClass resource
 type DistributionClassSpec struct {
 	// List of one or more providers to deploy Distributions to. At least
 	// one must be provided
 	Providers ProviderList `json:"providers"`
 }
 
-// The current state of the DistributionClass Resource
-type DistributionClassStatus struct {
-	// Currently unused, this exists for possible future usage
-	Ready bool `json:"ready"`
+type ProviderList struct {
+	// If this block exists, Distributions referencing this
+	// DistributionClass will be setup in CloudFront. You can specify an
+	// Access Key and Secret key in this block, or authorize the pod
+	// directly by setting the AWS_ACCESS_KEY_ID / AWS_ACCESS_KEY_ID
+	// environment variables, or using AWS' IAM Roles For Service Accounts
+	// (IRSA) Controller.
+	// +optional
+	CloudFront *cloudfront.CloudFrontSpec `json:"cloudfront,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
-// Represents a type of distribution scheme, to one or more cdn
-// providers.
-type DistributionClass struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   DistributionClassSpec   `json:"spec,omitempty"`
-	Status DistributionClassStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// DistributionClassList contains a list of DistributionClass
+// DistributionClassList contains a list of DistributionClasses
+// +kubebuilder:object:root=true
 type DistributionClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []DistributionClass `json:"items"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:resource:scope=Cluster
-//+kubebuilder:subresource:status
-
-// Represents a type of distribution scheme, to one or more cdn
-// providers. This resource is cluster wide, so can be referenced by
-// distributions in any namespace.
-type ClusterDistributionClass struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   DistributionClassSpec   `json:"spec,omitempty"`
-	Status DistributionClassStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
 // ClusterDistributionClassList contains a list of ClusterDistributionClass
+//+kubebuilder:object:root=true
 type ClusterDistributionClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterDistributionClass `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&DistributionClass{}, &DistributionClassList{})
-	SchemeBuilder.Register(&ClusterDistributionClass{}, &ClusterDistributionClassList{})
 }
