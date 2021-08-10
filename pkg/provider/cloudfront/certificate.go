@@ -17,10 +17,10 @@ limitations under the License.
 package cloudfront
 
 import (
-	"crypto/x509"
-	"encoding/pem"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/acm"
+	"regexp"
+	"strings"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
@@ -40,8 +40,18 @@ func (c *CertificateProvider) Reconcile() error {
 	}
 }
 
+func (c *CertificateProvider) getSerial() string {
+	re := regexp.MustCompile("..")
+	code := c.Certificate.Certificate.Parsed.SerialNumber.Text(16)
+	if len(code)%2 == 1 {
+		code = "0" + code
+	}
+
+	return strings.TrimRight(re.ReplaceAllString(code, "$0:"), ":")
+}
+
 func (c *CertificateProvider) Check() error {
-	info, err := c.Client.GetCertificate(&acm.GetCertificateInput{
+	info, err := c.Client.DescribeCertificate(&acm.DescribeCertificateInput{
 		CertificateArn: aws.String(c.Status.CloudFront.CertificateArn),
 	})
 
@@ -52,10 +62,7 @@ func (c *CertificateProvider) Check() error {
 		return err
 	}
 
-	// We just need to double check that the serial numbers match
-	block, _ := pem.Decode([]byte(*info.Certificate))
-	cert, _ := x509.ParseCertificate(block.Bytes)
-	if c.Certificate.Certificate.Parsed.SerialNumber.Cmp(cert.SerialNumber) != 0 {
+	if c.getSerial() != *info.Certificate.Serial {
 		return c.Create()
 	}
 
