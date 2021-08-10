@@ -89,3 +89,19 @@ func (c *CertificateProvider) Create() error {
 	c.Status.CloudFront.CertificateArn = *info.CertificateArn
 	return nil
 }
+
+func (c *CertificateProvider) Delete() error {
+	_, err := c.Client.DeleteCertificate(&acm.DeleteCertificateInput{
+		CertificateArn: aws.String(c.Status.CloudFront.CertificateArn),
+	})
+
+	if is, _ := isAwsError(err, "ResourceNotFoundException"); is {
+		c.Status.CloudFront.CertificateArn = ""
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	c.Status.CloudFront.CertificateArn = ""
+	return nil
+}

@@ -31,7 +31,7 @@ type CloudFrontProvider struct {
 }
 
 func (p CloudFrontProvider) Has(status api.DistributionStatus) bool {
-	return status.CloudFront.ID != ""
+	return status.CloudFront.ID != "" || status.CloudFront.CertificateArn != ""
 }
 
 func (p CloudFrontProvider) Wants(class api.DistributionClassSpec) bool {
@@ -91,11 +91,34 @@ func (p CloudFrontProvider) Delete(
 	status *api.DistributionStatus,
 ) error {
 	sess := p.getSession(class)
-	provider := DistributionProvider{
-		Client:       cloudfront.New(sess),
-		Distribution: distro,
-		Status:       status,
+
+	if status.CloudFront.ID != "" {
+		cloudfront := DistributionProvider{
+			Client:       cloudfront.New(sess),
+			Distribution: distro,
+			Status:       status,
+		}
+
+		err := cloudfront.Delete()
+		if err != nil {
+			return err
+		}
 	}
 
-	return provider.Delete()
+	// If the CloudFront distro has not been deleted yet, we can't attempt
+	// to delete the certificate
+	if status.CloudFront.ID != "" {
+		return nil
+	}
+
+	acm := CertificateProvider{
+		// ACM certs must always be in us-east-1 for Cloudfront so we
+		// override the region here
+		Client: acm.New(sess, &aws.Config{
+			Region: aws.String("us-east-1"),
+		}),
+		Status: status,
+	}
+
+	return acm.Delete()
 }
