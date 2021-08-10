@@ -17,7 +17,7 @@ package provider
 
 import (
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	k8s "git.redcoat.dev/cdn/pkg/provider/kubernetes"
+	"git.redcoat.dev/cdn/pkg/resolver"
 )
 
 // A CDNProvider is the top level logic holder for a CDN integration (eg
@@ -50,8 +50,8 @@ type CDNProvider interface {
 	Reconcile(
 		api.DistributionClassSpec,
 		api.Distribution,
-		k8s.ResolvedOrigin,
-		*k8s.Certificate,
+		resolver.ResolvedOrigin,
+		*resolver.Certificate,
 		*api.DistributionStatus,
 	) error
 

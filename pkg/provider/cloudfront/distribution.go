@@ -26,14 +26,14 @@ import (
 
 	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
+	"git.redcoat.dev/cdn/pkg/resolver"
 )
 
 type DistributionProvider struct {
 	Client       *cloudfront.CloudFront
 	Distribution api.Distribution
 	Class        cfapi.CloudFrontSpec
-	Origin       kubernetes.ResolvedOrigin
+	Origin       resolver.ResolvedOrigin
 	Status       *api.DistributionStatus
 	CurrentState *cloudfront.Distribution
 	DesiredState *cloudfront.DistributionConfig

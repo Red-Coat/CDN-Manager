@@ -23,13 +23,13 @@ import (
 	"strings"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
+	"git.redcoat.dev/cdn/pkg/resolver"
 )
 
 type CertificateProvider struct {
 	Client      *acm.ACM
 	Status      *api.DistributionStatus
-	Certificate *kubernetes.Certificate
+	Certificate *resolver.Certificate
 }
 
 func (c *CertificateProvider) Reconcile() error {

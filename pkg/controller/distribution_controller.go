@@ -33,7 +33,7 @@ import (
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/provider"
 	"git.redcoat.dev/cdn/pkg/provider/cloudfront"
-	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
+	"git.redcoat.dev/cdn/pkg/resolver"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 )
@@ -42,8 +42,8 @@ import (
 type DistributionReconciler struct {
 	client.Client
 	Scheme              *runtime.Scheme
-	OriginResolver      *kubernetes.OriginResolver
-	CertificateResolver *kubernetes.CertificateResolver
+	OriginResolver      *resolver.OriginResolver
+	CertificateResolver *resolver.CertificateResolver
 	Providers           []provider.CDNProvider
 }
 
@@ -151,7 +151,7 @@ func (r *DistributionReconciler) reconcileProviders(
 		return ctrl.Result{}
 	}
 
-	var cert *kubernetes.Certificate
+	var cert *resolver.Certificate
 	if tls := distro.Spec.TLS; tls != nil {
 		cert, err = r.CertificateResolver.Resolve(client.ObjectKey{
 			Namespace: distro.Namespace,
@@ -311,8 +311,8 @@ func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		cloudfront.CloudFrontProvider{},
 	}
 
-	r.OriginResolver = &kubernetes.OriginResolver{Client: mgr.GetClient()}
-	r.CertificateResolver = &kubernetes.CertificateResolver{Client: mgr.GetClient()}
+	r.OriginResolver = &resolver.OriginResolver{Client: mgr.GetClient()}
+	r.CertificateResolver = &resolver.CertificateResolver{Client: mgr.GetClient()}
 
 	return builder.Complete(r)
 }

@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
+	"git.redcoat.dev/cdn/pkg/resolver"
 )
 
 type CloudFrontProvider struct {
@@ -53,8 +53,8 @@ func (p CloudFrontProvider) getSession(class api.DistributionClassSpec) *session
 func (p CloudFrontProvider) Reconcile(
 	class api.DistributionClassSpec,
 	distro api.Distribution,
-	origin kubernetes.ResolvedOrigin,
-	cert *kubernetes.Certificate,
+	origin resolver.ResolvedOrigin,
+	cert *resolver.Certificate,
 	status *api.DistributionStatus,
 ) error {
 	sess := p.getSession(class)
