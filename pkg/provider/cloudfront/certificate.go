@@ -17,7 +17,8 @@ limitations under the License.
 package cloudfront
 
 import (
-	"fmt"
+	"crypto/x509"
+	"encoding/pem"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/acm"
 
@@ -45,21 +46,33 @@ func (c *CertificateProvider) Check() error {
 	})
 
 	if is, _ := isAwsError(err, "ResourceNotFoundException"); is {
+		c.Status.CloudFront.CertificateArn = ""
 		return c.Create()
 	} else if err != nil {
 		return err
 	}
 
-	fmt.Println(*info.Certificate)
+	// We just need to double check that the serial numbers match
+	block, _ := pem.Decode([]byte(*info.Certificate))
+	cert, _ := x509.ParseCertificate(block.Bytes)
+	if c.Certificate.Certificate.Parsed.SerialNumber.Cmp(cert.SerialNumber) != 0 {
+		return c.Create()
+	}
 
 	return nil
 }
 
 func (c *CertificateProvider) Create() error {
+	var arn *string
+	if c.Status.CloudFront.CertificateArn != "" {
+		arn = aws.String(c.Status.CloudFront.CertificateArn)
+	}
+
 	info, err := c.Client.ImportCertificate(&acm.ImportCertificateInput{
 		Certificate:      c.Certificate.Certificate.Encoded,
 		CertificateChain: c.Certificate.Chain,
 		PrivateKey:       c.Certificate.Key,
+		CertificateArn:   arn,
 	})
 
 	if err != nil {
