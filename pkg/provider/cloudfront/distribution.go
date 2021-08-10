@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
+	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/provider/kubernetes"
 )
@@ -31,6 +32,7 @@ import (
 type DistributionProvider struct {
 	Client       *cloudfront.CloudFront
 	Distribution api.Distribution
+	Class        cfapi.CloudFrontSpec
 	Origin       kubernetes.ResolvedOrigin
 	Status       *api.DistributionStatus
 	CurrentState *cloudfront.Distribution
@@ -79,6 +81,37 @@ func (c *DistributionProvider) calculateViewerPolicy() string {
 	return cloudfront.ViewerProtocolPolicyRedirectToHttps
 }
 
+func (c *DistributionProvider) calculateViewerCertificate() *cloudfront.ViewerCertificate {
+	var cert cloudfront.ViewerCertificate
+	if c.Status.CloudFront.CertificateArn != "" {
+		arn := aws.String(c.Status.CloudFront.CertificateArn)
+		cert.ACMCertificateArn = arn
+		cert.Certificate = arn
+		cert.
+			SetCertificateSource("acm").
+			SetMinimumProtocolVersion("TLSv1.2_2021").
+			SetSSLSupportMethod(c.Class.SSLMode)
+	} else {
+		cert.
+			SetCertificateSource("cloudfront").
+			SetCloudFrontDefaultCertificate(true).
+			SetMinimumProtocolVersion("TLSv1")
+	}
+
+	return &cert
+}
+
+func (c *DistributionProvider) calculateAliases() *cloudfront.Aliases {
+	aliases := cloudfront.Aliases{
+		Quantity: aws.Int64(int64(len(c.Distribution.Spec.Hosts))),
+	}
+	if *aliases.Quantity > 0 {
+		aliases.Items = aws.StringSlice(c.Distribution.Spec.Hosts)
+	}
+
+	return &aliases
+}
+
 // Calculates the full desired state of the CloudFront Distribution
 //
 // This is used to create new Distributions, to compare against existing
@@ -122,10 +155,7 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 		OriginGroups: &cloudfront.OriginGroups{
 			Quantity: aws.Int64(0),
 		},
-		Aliases: &cloudfront.Aliases{
-			Quantity: aws.Int64(int64(len(c.Distribution.Spec.Hosts))),
-			//Items:    aws.StringSlice(c.Distribution.Spec.Hosts),
-		},
+		Aliases: c.calculateAliases(),
 		CacheBehaviors: &cloudfront.CacheBehaviors{
 			Quantity: aws.Int64(0),
 		},
@@ -135,12 +165,8 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 				RestrictionType: aws.String(cloudfront.GeoRestrictionTypeNone),
 			},
 		},
-		ViewerCertificate: &cloudfront.ViewerCertificate{
-			CertificateSource:            aws.String("cloudfront"),
-			CloudFrontDefaultCertificate: aws.Bool(true),
-			MinimumProtocolVersion:       aws.String("TLSv1"),
-		},
-		PriceClass: aws.String(cloudfront.PriceClassPriceClassAll),
+		ViewerCertificate: c.calculateViewerCertificate(),
+		PriceClass:        aws.String(cloudfront.PriceClassPriceClassAll),
 		Logging: &cloudfront.LoggingConfig{
 			Enabled:        aws.Bool(false),
 			Bucket:         aws.String(""),

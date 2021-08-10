@@ -77,6 +77,7 @@ func (p CloudFrontProvider) Reconcile(
 	cloudfront := DistributionProvider{
 		Client:       cloudfront.New(sess),
 		Distribution: distro,
+		Class:        *class.Providers.CloudFront,
 		Origin:       origin,
 		Status:       status,
 	}

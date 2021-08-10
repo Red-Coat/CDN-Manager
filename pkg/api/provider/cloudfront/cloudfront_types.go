@@ -42,9 +42,10 @@ type CloudFrontSpec struct {
 	// Set this true if you need to request a dedicated IP address for
 	// your distribution in order to support legacy (non-SNI) clients.
 	// Warning, this will incurr high costs from AWS!
-	// +kubebuilder:default=false
+	// +kubebuilder:default=sni-only
+	// +kubebuilder:validation:Enum=sni-only;vpi;static-ip
 	// +optional
-	DedicatedIP bool `json:"dedicatedIP"`
+	SSLMode string `json:"sslMode"`
 }
 
 // The status of a CloudFront Distribution, if one was requested by the
