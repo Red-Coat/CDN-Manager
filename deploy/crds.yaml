@@ -316,51 +316,20 @@ spec:
                       target.
                     type: string
                   httpPort:
+                    default: 80
                     description: The port to target for HTTP requests. If not given,
                       this defaults to 80.
-                    properties:
-                      name:
-                        description: If targetting a service, this is the named port
-                          on that Service resource. This is a mutually exclusive setting
-                          with "Number".
-                        type: string
-                      number:
-                        description: The numerical port number (e.g. 80) to target.
-                          This is a mutally exclusive setting with "Name".
-                        format: int32
-                        type: integer
-                    type: object
+                    format: int32
+                    type: integer
                   httpsPort:
+                    default: 443
                     description: The port to target for HTTPS requests. If not given,
                       this defaults to 443.
-                    properties:
-                      name:
-                        description: If targetting a service, this is the named port
-                          on that Service resource. This is a mutually exclusive setting
-                          with "Number".
-                        type: string
-                      number:
-                        description: The numerical port number (e.g. 80) to target.
-                          This is a mutally exclusive setting with "Name".
-                        format: int32
-                        type: integer
-                    type: object
-                  targetRef:
-                    description: If you want to target another Resource in the cluster
-                      (eg a Service or an Ingress) specify it here. The Distribution
-                      will point to that service's ingress load balancer.
-                    properties:
-                      kind:
-                        description: The kind of resource to target
-                        type: string
-                      name:
-                        description: The name of the resource to target. This must
-                          be in the same namespace as the Distribution resource.
-                        type: string
-                    required:
-                    - kind
-                    - name
-                    type: object
+                    format: int32
+                    type: integer
+                required:
+                - httpPort
+                - httpsPort
                 type: object
               supportedMethods:
                 description: "The list of HTTP methods to support. Others will be

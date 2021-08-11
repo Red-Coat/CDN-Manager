@@ -133,8 +133,8 @@ func getDesiredDistribution(ingress networking.Ingress, class api.ObjectReferenc
 			DistributionClassRef: class,
 			Origin: api.Origin{
 				Host:      util.GetIngressHost(ingress.Status.LoadBalancer.Ingress),
-				HTTPPort:  &api.ServicePort{Number: 80},
-				HTTPSPort: &api.ServicePort{Number: 443},
+				HTTPPort:  80,
+				HTTPSPort: 443,
 			},
 			SupportedMethods: []string{"GET", "HEAD"},
 		},

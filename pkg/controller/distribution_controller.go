@@ -54,16 +54,11 @@ const finalizer = "cdn.redcoat.dev/finalizer"
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/finalizers,verbs=update
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributionclasses,verbs=get;watch
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=clusterdistributionclasses,verbs=get;watch
-// +kubebuilder:rbac:groups=v1,resources=services,verbs=get;watch
-// +kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
 type DistributionReconciler struct {
 	client.Client
 
 	// The current scheme we are working with
 	Scheme *runtime.Scheme
-
-	// Used to "resolve" the desired origin for the given distribution
-	OriginResolver resolver.OriginResolver
 
 	// Used to load the required certificate for the distribution's TLS
 	// settings
@@ -87,7 +82,6 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 		Client:              client,
 		Scheme:              mgr.GetScheme(),
 		Logger:              logger.WithName("ctrl"),
-		OriginResolver:      resolver.OriginResolver{Client: client},
 		CertificateResolver: resolver.CertificateResolver{Client: client},
 		Providers: []provider.CDNProvider{
 			cloudfront.CloudFrontProvider{},
@@ -100,7 +94,6 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 	watch(log, builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
 	watch(log, builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
 	watch(log, builder, mgr, &corev1.Secret{}, getSecretRef, true)
-	watch(log, builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
 
 	return builder.Complete(&reconciller)
 }
@@ -197,13 +190,7 @@ func (r *DistributionReconciler) reconcileProviders(
 	class api.DistributionClassSpec,
 	distro api.Distribution,
 ) ctrl.Result {
-	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
-	if err != nil {
-		r.log.Error(err, "Unable to resolve origin")
-		r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
-		return ctrl.Result{}
-	}
-
+	var err error
 	var cert *resolver.Certificate
 	if tls := distro.Spec.TLS; tls != nil {
 		r.log.V(1).Info("Distro has TLS. Running CertificateResolver")
@@ -228,7 +215,7 @@ func (r *DistributionReconciler) reconcileProviders(
 			continue
 		}
 
-		err := provider.Reconcile(class, distro, resolvedOrigin, cert, newStatus)
+		err := provider.Reconcile(class, distro, cert, newStatus)
 
 		if err != nil {
 			// In the event of an error we'll requeue immediately
@@ -384,13 +371,6 @@ func watch(
 // Used to setup index fields
 func getDistributionClassRef(distro *api.Distribution) *api.ObjectReference {
 	return &distro.Spec.DistributionClassRef
-}
-
-// Gets the OriginTarget Object Reference
-//
-// Used to setup index fields
-func getOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
-	return distro.Spec.Origin.Target
 }
 
 // Gets the SecretRef field and return this as an Object Reference

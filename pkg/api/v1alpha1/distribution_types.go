@@ -90,27 +90,20 @@ type DistributionSpec struct {
 // Options for the "origin" of the distribition - ie where the CDN
 // points to.
 type Origin struct {
-	// If you want to target another Resource in the cluster (eg a Service
-	// or an Ingress) specify it here. The Distribution will point to that
-	// service's ingress load balancer.
-	// +optional
-	Target *ObjectReference `json:"targetRef"`
-
 	// If you specify this, this takes precendence over any detected
 	// ingress load balancer hostnames. Use this to override the target's
 	// hostname, or if you have not specified a kubernetes target.
-	// +optional
 	Host string `json:"host,omitempty"`
 
 	// The port to target for HTTP requests. If not given, this defaults
 	// to 80.
-	// +optional
-	HTTPPort *ServicePort `json:"httpPort"`
+	// +kubebuilder:default=80
+	HTTPPort int32 `json:"httpPort"`
 
 	// The port to target for HTTPS requests. If not given, this defaults
 	// to 443.
-	// +optional
-	HTTPSPort *ServicePort `json:"httpsPort"`
+	// +kubebuilder:default=443
+	HTTPSPort int32 `json:"httpsPort"`
 }
 
 // Options to control the way TLS works within this distribution
@@ -130,20 +123,6 @@ type TLSSpec struct {
 	// kubernetes.io/tls and have the required fields (tls.crt and
 	// tls.key). Other fields are ignored.
 	SecretRef string `json:"secretName"`
-}
-
-// Used to represent a port on a service. Either name or number must be
-// specified
-type ServicePort struct {
-	// If targetting a service, this is the named port on that Service
-	// resource. This is a mutually exclusive setting with "Number".
-	// +optional
-	Name string `json:"name"`
-
-	// The numerical port number (e.g. 80) to target. This is a mutally
-	// exclusive setting with "Name".
-	// +optional
-	Number int32 `json:"number"`
 }
 
 // The current State of the Distribution

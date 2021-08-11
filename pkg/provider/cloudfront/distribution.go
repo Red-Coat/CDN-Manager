@@ -27,14 +27,12 @@ import (
 
 	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/resolver"
 )
 
 type DistributionProvider struct {
 	Client       *cloudfront.CloudFront
 	Distribution api.Distribution
 	Class        cfapi.CloudFrontSpec
-	Origin       resolver.ResolvedOrigin
 	Status       *api.DistributionStatus
 	CurrentState *cloudfront.Distribution
 	DesiredState *cloudfront.DistributionConfig
@@ -46,16 +44,12 @@ func NewDistributionProvider(
 	class api.DistributionClassSpec,
 	distro api.Distribution,
 	status *api.DistributionStatus,
-	origin *resolver.ResolvedOrigin,
 ) *DistributionProvider {
 	provider := DistributionProvider{
 		Client:       cloudfront.New(cfg),
 		Class:        *class.Providers.CloudFront,
 		Distribution: distro,
 		Status:       status,
-	}
-	if origin != nil {
-		provider.Origin = *origin
 	}
 
 	return &provider
@@ -150,8 +144,8 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 		Origins: &cloudfront.Origins{
 			Quantity: aws.Int64(1),
 			Items: []*cloudfront.Origin{&cloudfront.Origin{
-				DomainName:         aws.String(c.Origin.Host),
-				Id:                 aws.String(c.Origin.Host),
+				DomainName:         aws.String(c.Distribution.Spec.Origin.Host),
+				Id:                 aws.String(c.Distribution.Spec.Origin.Host),
 				ConnectionAttempts: aws.Int64(3),
 				ConnectionTimeout:  aws.Int64(10),
 				CustomHeaders: &cloudfront.CustomHeaders{
@@ -159,8 +153,8 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 				},
 				OriginPath: aws.String(""),
 				CustomOriginConfig: &cloudfront.CustomOriginConfig{
-					HTTPPort:               aws.Int64(int64(c.Origin.HTTPPort)),
-					HTTPSPort:              aws.Int64(int64(c.Origin.HTTPSPort)),
+					HTTPPort:               aws.Int64(int64(c.Distribution.Spec.Origin.HTTPPort)),
+					HTTPSPort:              aws.Int64(int64(c.Distribution.Spec.Origin.HTTPSPort)),
 					OriginProtocolPolicy:   aws.String("match-viewer"),
 					OriginReadTimeout:      aws.Int64(30),
 					OriginKeepaliveTimeout: aws.Int64(30),
@@ -199,7 +193,7 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 		WebACLId:          aws.String(""),
 		HttpVersion:       aws.String("http2"),
 		DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
-			TargetOriginId:        aws.String(c.Origin.Host),
+			TargetOriginId:        aws.String(c.Distribution.Spec.Origin.Host),
 			ViewerProtocolPolicy:  aws.String(c.calculateViewerPolicy()),
 			Compress:              aws.Bool(true),
 			CachePolicyId:         aws.String(c.Class.CachePolicyId),

@@ -50,7 +50,6 @@ type CDNProvider interface {
 	Reconcile(
 		api.DistributionClassSpec,
 		api.Distribution,
-		resolver.ResolvedOrigin,
 		*resolver.Certificate,
 		*api.DistributionStatus,
 	) error

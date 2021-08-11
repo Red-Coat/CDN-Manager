@@ -51,7 +51,6 @@ func (p CloudFrontProvider) getSession(class api.DistributionClassSpec) *session
 func (p CloudFrontProvider) Reconcile(
 	class api.DistributionClassSpec,
 	distro api.Distribution,
-	origin resolver.ResolvedOrigin,
 	cert *resolver.Certificate,
 	status *api.DistributionStatus,
 ) error {
@@ -62,7 +61,7 @@ func (p CloudFrontProvider) Reconcile(
 		return err
 	}
 
-	return NewDistributionProvider(sess, class, distro, status, &origin).
+	return NewDistributionProvider(sess, class, distro, status).
 		Reconcile()
 }
 
@@ -74,8 +73,7 @@ func (p CloudFrontProvider) Delete(
 	sess := p.getSession(class)
 
 	if status.CloudFront.ID != "" {
-		err := NewDistributionProvider(sess, class, distro, status, nil).
-			Delete()
+		err := NewDistributionProvider(sess, class, distro, status).Delete()
 		if err != nil {
 			return err
 		}
