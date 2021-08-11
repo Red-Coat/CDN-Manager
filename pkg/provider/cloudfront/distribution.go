@@ -22,6 +22,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
 	cfapi "git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
@@ -37,6 +38,27 @@ type DistributionProvider struct {
 	Status       *api.DistributionStatus
 	CurrentState *cloudfront.Distribution
 	DesiredState *cloudfront.DistributionConfig
+}
+
+// Sets up a new instance of the DistributionProvider
+func NewDistributionProvider(
+	cfg client.ConfigProvider,
+	class api.DistributionClassSpec,
+	distro api.Distribution,
+	status *api.DistributionStatus,
+	origin *resolver.ResolvedOrigin,
+) *DistributionProvider {
+	provider := DistributionProvider{
+		Client:       cloudfront.New(cfg),
+		Class:        *class.Providers.CloudFront,
+		Distribution: distro,
+		Status:       status,
+	}
+	if origin != nil {
+		provider.Origin = *origin
+	}
+
+	return &provider
 }
 
 // Calculates the Allowed and Cached methods for the CloudFront

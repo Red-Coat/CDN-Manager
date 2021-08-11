@@ -18,6 +18,7 @@ package cloudfront
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/acm"
 	"regexp"
 	"strings"
@@ -30,6 +31,24 @@ type CertificateProvider struct {
 	Client      *acm.ACM
 	Status      *api.DistributionStatus
 	Certificate *resolver.Certificate
+}
+
+// Sets up a new instance of the CertificateProvider
+func NewCertificateProvider(
+	cfg client.ConfigProvider,
+	status *api.DistributionStatus,
+	cert *resolver.Certificate,
+) *CertificateProvider {
+	return &CertificateProvider{
+		Client: acm.New(cfg, &aws.Config{
+			// For cloudfront, all certificates have to be in the us-east-1
+			// region, regardless of anything else, so we hard code the region
+			// here.
+			Region: aws.String("us-east-1"),
+		}),
+		Status:      status,
+		Certificate: cert,
+	}
 }
 
 func (c *CertificateProvider) Reconcile() error {

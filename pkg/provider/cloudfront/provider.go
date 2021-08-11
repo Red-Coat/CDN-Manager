@@ -19,15 +19,13 @@ package cloudfront
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/acm"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/resolver"
 )
 
 type CloudFrontProvider struct {
-	Clients map[string]cloudfront.CloudFront
+	Clients map[string]session.Session
 }
 
 func (p CloudFrontProvider) Has(status api.DistributionStatus) bool {
@@ -59,30 +57,13 @@ func (p CloudFrontProvider) Reconcile(
 ) error {
 	sess := p.getSession(class)
 
-	acm := CertificateProvider{
-		// ACM certs must always be in us-east-1 for Cloudfront so we
-		// override the region here
-		Client: acm.New(sess, &aws.Config{
-			Region: aws.String("us-east-1"),
-		}),
-		Certificate: cert,
-		Status:      status,
-	}
-
-	err := acm.Reconcile()
+	err := NewCertificateProvider(sess, status, cert).Reconcile()
 	if err != nil {
 		return err
 	}
 
-	cloudfront := DistributionProvider{
-		Client:       cloudfront.New(sess),
-		Distribution: distro,
-		Class:        *class.Providers.CloudFront,
-		Origin:       origin,
-		Status:       status,
-	}
-
-	return cloudfront.Reconcile()
+	return NewDistributionProvider(sess, class, distro, status, &origin).
+		Reconcile()
 }
 
 func (p CloudFrontProvider) Delete(
@@ -93,13 +74,8 @@ func (p CloudFrontProvider) Delete(
 	sess := p.getSession(class)
 
 	if status.CloudFront.ID != "" {
-		cloudfront := DistributionProvider{
-			Client:       cloudfront.New(sess),
-			Distribution: distro,
-			Status:       status,
-		}
-
-		err := cloudfront.Delete()
+		err := NewDistributionProvider(sess, class, distro, status, nil).
+			Delete()
 		if err != nil {
 			return err
 		}
@@ -111,14 +87,5 @@ func (p CloudFrontProvider) Delete(
 		return nil
 	}
 
-	acm := CertificateProvider{
-		// ACM certs must always be in us-east-1 for Cloudfront so we
-		// override the region here
-		Client: acm.New(sess, &aws.Config{
-			Region: aws.String("us-east-1"),
-		}),
-		Status: status,
-	}
-
-	return acm.Delete()
+	return NewCertificateProvider(sess, status, nil).Delete()
 }
