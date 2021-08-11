@@ -63,7 +63,8 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	log := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(log)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -81,6 +82,7 @@ func main() {
 	if err = (&controller.DistributionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Logger: log,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Distribution")
 		os.Exit(1)

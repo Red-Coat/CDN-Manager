@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -45,6 +46,8 @@ type DistributionReconciler struct {
 	OriginResolver      *resolver.OriginResolver
 	CertificateResolver *resolver.CertificateResolver
 	Providers           []provider.CDNProvider
+	Logger              logr.Logger
+	log                 logr.Logger
 }
 
 const FINALIZER = "cdn.redcoat.dev/finalizer"
@@ -58,6 +61,9 @@ const FINALIZER = "cdn.redcoat.dev/finalizer"
 //+kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
 
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.log = r.Logger.WithValues("distribution", req.Namespace+"/"+req.Name)
+	r.log.Info("Reconcilliation")
+
 	distro, class := r.load(ctx, req)
 
 	if distro == nil {
@@ -65,6 +71,7 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if distro.ObjectMeta.DeletionTimestamp.IsZero() {
+		r.log.V(1).Info("Starting Reconcilliation Loop")
 		if !controllerutil.ContainsFinalizer(distro, FINALIZER) {
 			controllerutil.AddFinalizer(distro, FINALIZER)
 			r.Update(ctx, distro)
@@ -72,9 +79,11 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		return r.reconcileProviders(ctx, *class, *distro), nil
 	} else if controllerutil.ContainsFinalizer(distro, FINALIZER) {
+		r.log.V(1).Info("Starting Deletion Loop")
 		allDeleted, result := r.deleteProviders(ctx, *class, *distro)
 
 		if allDeleted {
+			r.log.Info("Deletion Complete. Removing Fianlizer")
 			controllerutil.RemoveFinalizer(distro, FINALIZER)
 			r.Update(ctx, distro)
 		}
@@ -91,6 +100,7 @@ func (r *DistributionReconciler) updateStatus(
 	distro api.Distribution,
 ) {
 	if !reflect.DeepEqual(newStatus, distro.Status) {
+		r.log.V(1).Info("Status change detected. Updating with api-server")
 		distro.Status = newStatus
 		r.Status().Update(ctx, &distro)
 	}
@@ -107,30 +117,43 @@ func (r *DistributionReconciler) load(
 	req ctrl.Request,
 ) (*api.Distribution, *api.DistributionClassSpec) {
 	var distro api.Distribution
+	var class api.DistributionClassSpec
 	err := r.Get(ctx, req.NamespacedName, &distro)
 
 	if err != nil {
+		r.log.V(-3).Error(err, "Could not load distribution")
 		return nil, nil
 	}
 
+	r.log = r.log.WithValues("class", distro.Spec.DistributionClassRef.Name)
+	r.log.V(1).Info(distro.Spec.DistributionClassRef.Kind)
+
 	if distro.Spec.DistributionClassRef.Kind == "ClusterDistributionClass" {
 		var parent api.ClusterDistributionClass
-		r.Get(ctx, client.ObjectKey{
+		err = r.Get(ctx, client.ObjectKey{
 			Name: distro.Spec.DistributionClassRef.Name,
 		}, &parent)
-		return &distro, &parent.Spec
+		class = parent.Spec
 	} else {
 		var parent api.DistributionClass
-		r.Get(ctx, client.ObjectKey{
+		err = r.Get(ctx, client.ObjectKey{
 			Namespace: distro.Namespace,
 			Name:      distro.Spec.DistributionClassRef.Name,
 		}, &parent)
-		return &distro, &parent.Spec
+		class = parent.Spec
 	}
+
+	if err != nil {
+		r.log.V(-3).Error(err, "Could not load distribution class")
+		return nil, nil
+	}
+
+	return &distro, &class
 }
 
-func requeueIfNotReady(result *ctrl.Result, condition bool) {
+func (r *DistributionReconciler) requeueIfNotReady(result *ctrl.Result, condition bool) {
 	if !result.Requeue && !condition {
+		r.log.Info("Resource is not in desired state. Scheduling recheck in 1m")
 		result.RequeueAfter, _ = time.ParseDuration("1m")
 	}
 }
@@ -142,23 +165,22 @@ func (r *DistributionReconciler) reconcileProviders(
 	class api.DistributionClassSpec,
 	distro api.Distribution,
 ) ctrl.Result {
-	log := log.FromContext(ctx)
-
 	resolvedOrigin, err := r.OriginResolver.Resolve(distro)
 	if err != nil {
-		log.Error(err, "Unable to resolve origin")
+		r.log.Error(err, "Unable to resolve origin")
 		r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
 		return ctrl.Result{}
 	}
 
 	var cert *resolver.Certificate
 	if tls := distro.Spec.TLS; tls != nil {
+		r.log.V(1).Info("Distro has TLS. Running CertificateResolver")
 		cert, err = r.CertificateResolver.Resolve(client.ObjectKey{
 			Namespace: distro.Namespace,
 			Name:      tls.SecretRef,
 		})
 		if err != nil {
-			log.Error(err, "Unable to load certificate")
+			r.log.Error(err, "Unable to load certificate")
 			r.updateStatus(ctx, api.DistributionStatus{Ready: false}, distro)
 			return ctrl.Result{}
 		}
@@ -180,13 +202,13 @@ func (r *DistributionReconciler) reconcileProviders(
 			// In the event of an error we'll requeue immediately
 			result.Requeue = true
 			newStatus.Ready = false
-			log.Error(err, "Unable to run provider")
+			r.log.Error(err, "Unable to run provider")
 		}
 	}
 
 	// If there hasn't been an error requiring immediate requeue, but we
 	// aren't ready yet, we'll requeue in a minute
-	requeueIfNotReady(&result, newStatus.Ready)
+	r.requeueIfNotReady(&result, newStatus.Ready)
 
 	r.updateStatus(ctx, *newStatus, distro)
 
@@ -221,13 +243,14 @@ func (r *DistributionReconciler) deleteProviders(
 		allDeleted = allDeleted && !provider.Has(*newStatus)
 	}
 
-	requeueIfNotReady(&result, allDeleted)
+	r.requeueIfNotReady(&result, allDeleted)
 	r.updateStatus(ctx, *newStatus, distro)
 
 	return allDeleted, result
 }
 
 func watch(
+	log logr.Logger,
 	builder *builder.Builder,
 	mgr ctrl.Manager,
 	kind client.Object,
@@ -236,11 +259,17 @@ func watch(
 ) {
 	kindName := reflect.TypeOf(kind).Elem().Name()
 	ctx := context.Background()
+	log = log.WithValues("kind", kindName)
 
 	mgr.GetFieldIndexer().IndexField(ctx, &api.Distribution{}, kindName,
 		func(object client.Object) []string {
 			ref := cache(object.(*api.Distribution))
 			if ref != nil && ref.Kind == kindName {
+				log.V(2).Info(
+					"Indexing Distribution",
+					"ref", ref.Name,
+					"distribution", client.ObjectKeyFromObject(object).String(),
+				)
 				return []string{ref.Name}
 			} else {
 				return []string{}
@@ -252,6 +281,9 @@ func watch(
 		&source.Kind{Type: kind},
 		handler.EnqueueRequestsFromMapFunc(
 			func(object client.Object) []ctrl.Request {
+				log := log.WithValues("resource", client.ObjectKeyFromObject(object))
+				log.V(2).Info("Detected change")
+
 				var distroList api.DistributionList
 				predicate := client.MatchingFields{kindName: object.GetName()}
 
@@ -265,9 +297,9 @@ func watch(
 
 				requests := make([]ctrl.Request, len(distroList.Items))
 				for i, distro := range distroList.Items {
-					requests[i] = ctrl.Request{
-						NamespacedName: client.ObjectKeyFromObject(&distro),
-					}
+					key := client.ObjectKeyFromObject(&distro)
+					log.V(1).Info("Queuing Reconcilliation", "distribution", key.String())
+					requests[i] = ctrl.Request{NamespacedName: key}
 				}
 
 				return requests
@@ -301,11 +333,14 @@ func getSecretRef(distro *api.Distribution) *api.ObjectReference {
 func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
-	watch(builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
-	watch(builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
-	watch(builder, mgr, &corev1.Secret{}, getSecretRef, true)
-	watch(builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
-	watch(builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
+	r.Logger = r.Logger.WithName("ctrl")
+
+	log := r.Logger.WithName("watch")
+	watch(log, builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
+	watch(log, builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
+	watch(log, builder, mgr, &corev1.Secret{}, getSecretRef, true)
+	watch(log, builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
+	watch(log, builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
 
 	r.Providers = []provider.CDNProvider{
 		cloudfront.CloudFrontProvider{},
