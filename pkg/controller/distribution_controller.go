@@ -36,7 +36,6 @@ import (
 	"git.redcoat.dev/cdn/pkg/provider/cloudfront"
 	"git.redcoat.dev/cdn/pkg/resolver"
 	corev1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1"
 )
 
 // The name of the finalizer used by this controller to manage the
@@ -102,7 +101,6 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 	watch(log, builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
 	watch(log, builder, mgr, &corev1.Secret{}, getSecretRef, true)
 	watch(log, builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
-	watch(log, builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
 
 	return builder.Complete(&reconciller)
 }
