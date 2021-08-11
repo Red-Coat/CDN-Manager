@@ -79,11 +79,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.DistributionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Logger: log,
-	}).SetupWithManager(mgr); err != nil {
+	if err = controller.NewDistributionController(mgr, log); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Distribution")
 		os.Exit(1)
 	}

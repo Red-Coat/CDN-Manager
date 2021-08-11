@@ -39,27 +39,80 @@ import (
 	networking "k8s.io/api/networking/v1"
 )
 
-// DistributionReconciler reconciles a Distribution object
+// The name of the finalizer used by this controller to manage the
+// cleanup of distributions on resource deletion
+const finalizer = "cdn.redcoat.dev/finalizer"
+
+// The DistributionReconciler contains all of the top level logic for
+// reconciling Distribution resources
+//
+// Although it performs the generic actions required during a
+// reconciliation, most of the specific actions are performed by the
+// relavent cloud-specific providers.
+//
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributionclasses,verbs=get;watch
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=clusterdistributionclasses,verbs=get;watch
+// +kubebuilder:rbac:groups=v1,resources=services,verbs=get;watch
+// +kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
 type DistributionReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	OriginResolver      *resolver.OriginResolver
-	CertificateResolver *resolver.CertificateResolver
-	Providers           []provider.CDNProvider
-	Logger              logr.Logger
-	log                 logr.Logger
+
+	// The current scheme we are working with
+	Scheme *runtime.Scheme
+
+	// Used to "resolve" the desired origin for the given distribution
+	OriginResolver resolver.OriginResolver
+
+	// Used to load the required certificate for the distribution's TLS
+	// settings
+	CertificateResolver resolver.CertificateResolver
+
+	// List of providers supported
+	Providers []provider.CDNProvider
+
+	// The generic Logger interface for the reconciller
+	Logger logr.Logger
+
+	// The specific Logger in use during the current run (this has values
+	// added for the current Distribution & DistributionClass)
+	log logr.Logger
 }
 
-const FINALIZER = "cdn.redcoat.dev/finalizer"
+// SetupWithManager sets up the controller with the Manager.
+func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
+	client := mgr.GetClient()
+	reconciller := DistributionReconciler{
+		Client:              client,
+		Scheme:              mgr.GetScheme(),
+		Logger:              logger.WithName("ctrl"),
+		OriginResolver:      resolver.OriginResolver{Client: client},
+		CertificateResolver: resolver.CertificateResolver{Client: client},
+		Providers: []provider.CDNProvider{
+			cloudfront.CloudFrontProvider{},
+		},
+	}
 
-//+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/finalizers,verbs=update
-//+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributionclasses,verbs=get;watch
-//+kubebuilder:rbac:groups=cdn.redcoat.dev,resources=clusterdistributionclasses,verbs=get;watch
-//+kubebuilder:rbac:groups=v1,resources=services,verbs=get;watch
-//+kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
+	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
+	log := reconciller.Logger.WithName("watch")
+	watch(log, builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
+	watch(log, builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
+	watch(log, builder, mgr, &corev1.Secret{}, getSecretRef, true)
+	watch(log, builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
+	watch(log, builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
+
+	return builder.Complete(&reconciller)
+}
+
+// Main function called when a reconciliation is required
+//
+// This method's primary job is loading up the resources in question
+// (the Distribution and associated DistributionClass or
+// ClusterDistributionClass), and then kicking off either a
+// reconciliation job or a deletion job.
 func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = r.Logger.WithValues("distribution", req.Namespace+"/"+req.Name)
 	r.log.Info("Reconcilliation")
@@ -72,19 +125,19 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if distro.ObjectMeta.DeletionTimestamp.IsZero() {
 		r.log.V(1).Info("Starting Reconcilliation Loop")
-		if !controllerutil.ContainsFinalizer(distro, FINALIZER) {
-			controllerutil.AddFinalizer(distro, FINALIZER)
+		if !controllerutil.ContainsFinalizer(distro, finalizer) {
+			controllerutil.AddFinalizer(distro, finalizer)
 			r.Update(ctx, distro)
 		}
 
 		return r.reconcileProviders(ctx, *class, *distro), nil
-	} else if controllerutil.ContainsFinalizer(distro, FINALIZER) {
+	} else if controllerutil.ContainsFinalizer(distro, finalizer) {
 		r.log.V(1).Info("Starting Deletion Loop")
 		allDeleted, result := r.deleteProviders(ctx, *class, *distro)
 
 		if allDeleted {
 			r.log.Info("Deletion Complete. Removing Fianlizer")
-			controllerutil.RemoveFinalizer(distro, FINALIZER)
+			controllerutil.RemoveFinalizer(distro, finalizer)
 			r.Update(ctx, distro)
 		}
 
@@ -92,18 +145,6 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func (r *DistributionReconciler) updateStatus(
-	ctx context.Context,
-	newStatus api.DistributionStatus,
-	distro api.Distribution,
-) {
-	if !reflect.DeepEqual(newStatus, distro.Status) {
-		r.log.V(1).Info("Status change detected. Updating with api-server")
-		distro.Status = newStatus
-		r.Status().Update(ctx, &distro)
-	}
 }
 
 // Loads a k8s Distribution and the DistributionClassSpec for its
@@ -149,13 +190,6 @@ func (r *DistributionReconciler) load(
 	}
 
 	return &distro, &class
-}
-
-func (r *DistributionReconciler) requeueIfNotReady(result *ctrl.Result, condition bool) {
-	if !result.Requeue && !condition {
-		r.log.Info("Resource is not in desired state. Scheduling recheck in 1m")
-		result.RequeueAfter, _ = time.ParseDuration("1m")
-	}
 }
 
 // Loops over the Providers and asks each one to reconicle if it has
@@ -249,6 +283,45 @@ func (r *DistributionReconciler) deleteProviders(
 	return allDeleted, result
 }
 
+// Checks to see if the status has been updated during the
+// reconciliation and updates it with the api-server if it has done
+func (r *DistributionReconciler) updateStatus(
+	ctx context.Context,
+	newStatus api.DistributionStatus,
+	distro api.Distribution,
+) {
+	if !reflect.DeepEqual(newStatus, distro.Status) {
+		r.log.V(1).Info("Status change detected. Updating with api-server")
+		distro.Status = newStatus
+		r.Status().Update(ctx, &distro)
+	}
+}
+
+// Checks to see if the given condition is not met and adds a requeue in
+// one minute request to the given result
+//
+// The "condition" depends on the caller - for the reconciliation code,
+// this is normally "Status.Ready", for the deletion code, this is if
+// all resources have been deleted.
+//
+// NB: This method checks to see if the Requeue flag has already been
+// set on the result. If it has, it does not add a 1m RequeueAfter as
+// the Requeue flag is assumed to mean "requeue immediately" (this is
+// normally set in the event of failure).
+func (r *DistributionReconciler) requeueIfNotReady(result *ctrl.Result, condition bool) {
+	if !result.Requeue && !condition {
+		r.log.Info("Resource is not in desired state. Scheduling recheck in 1m")
+		result.RequeueAfter, _ = time.ParseDuration("1m")
+	}
+}
+
+// Sets up the controller to watch one of the resources that
+// Distribution objects reference
+//
+// This needs to perform two main tasks: setting up an index on the
+// Distributions for the value that they reference, so that they can
+// easily be listed, and watching the depended upon resources and
+// queueing distribution changes accordingly.
 func watch(
 	log logr.Logger,
 	builder *builder.Builder,
@@ -308,14 +381,23 @@ func watch(
 	)
 }
 
+// Gets the DistributionClass Object Reference
+//
+// Used to setup index fields
 func getDistributionClassRef(distro *api.Distribution) *api.ObjectReference {
 	return &distro.Spec.DistributionClassRef
 }
 
+// Gets the OriginTarget Object Reference
+//
+// Used to setup index fields
 func getOriginTargetRef(distro *api.Distribution) *api.ObjectReference {
 	return distro.Spec.Origin.Target
 }
 
+// Gets the SecretRef field and return this as an Object Reference
+//
+// Used to setup index fields
 func getSecretRef(distro *api.Distribution) *api.ObjectReference {
 	if tlsSpec := distro.Spec.TLS; tlsSpec != nil {
 		if secret := tlsSpec.SecretRef; secret != "" {
@@ -327,27 +409,4 @@ func getSecretRef(distro *api.Distribution) *api.ObjectReference {
 	}
 
 	return nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *DistributionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
-
-	r.Logger = r.Logger.WithName("ctrl")
-
-	log := r.Logger.WithName("watch")
-	watch(log, builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
-	watch(log, builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
-	watch(log, builder, mgr, &corev1.Secret{}, getSecretRef, true)
-	watch(log, builder, mgr, &corev1.Service{}, getOriginTargetRef, true)
-	watch(log, builder, mgr, &networking.Ingress{}, getOriginTargetRef, true)
-
-	r.Providers = []provider.CDNProvider{
-		cloudfront.CloudFrontProvider{},
-	}
-
-	r.OriginResolver = &resolver.OriginResolver{Client: mgr.GetClient()}
-	r.CertificateResolver = &resolver.CertificateResolver{Client: mgr.GetClient()}
-
-	return builder.Complete(r)
 }
