@@ -20,14 +20,14 @@ import (
 	"context"
 	"reflect"
 
+	networking "k8s.io/api/networking/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/util"
-	networking "k8s.io/api/networking/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (

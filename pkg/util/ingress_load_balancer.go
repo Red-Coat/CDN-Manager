@@ -16,7 +16,9 @@ limitations under the License.
 
 package util
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+)
 
 // Checks to see if a LoadBalancerIngress[] resource has any values and
 // uses this as the origin hostname if it does
