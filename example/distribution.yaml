@@ -1,0 +1,44 @@
+apiVersion: cdn.redcoat.dev/v1alpha1
+kind: Distribution
+metadata:
+  name: example
+spec:
+  distributionClass:
+    # DistributionClass for namespace scoped classes,
+    # ClusterDistributionClass for cluster scoped classes
+    kind: ClusterDistributionClass
+
+    # See examples/clusterdistributionclass.yaml for this
+    name: cloudfront-default
+
+  # List of hostnames the CDN will support
+  hosts:
+    - example.com
+
+  # The "origin" that the CDN will connect to as the source of truth for
+  # its caches
+  origin:
+    # The hostname to connect to.
+    # If created from an ingress resource, this will be pulled from the
+    # status.loadbalancer.ingress[0].hostname field.
+    host: 10-0-0-1.cloudprovider.example.net
+
+    # The port the CDN will connect to your on origin for http requests.
+    # If not provided, this will default to 80
+    httpPort: 80
+
+    # The port the CDN will connect to on your origin for https
+    # requests. If not provided, this will default to 443.
+    httpsPort: 443
+
+  # Information about TLS
+  tls:
+    # The name of the secret _in the same namespace as the
+    # Distribution_, which contains the TLS cert and key.
+    secretName: example-com-tls-cert
+
+    # How we will treat http requests. Valid values:
+    # - "redirect" - redirect HTTP to HTTPS
+    # - "both" - support either HTTP or HTTPS
+    # - "https-only" - reject all HTTP connections
+    mode: redirect

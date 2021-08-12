@@ -1,0 +1,20 @@
+apiVersion: cdn.redcoat.dev/v1alpha1
+kind: ClusterDistributionClass
+metadata:
+  name: cloudfront-default
+spec:
+  providers:
+    # The presence of the "cloudfront" block will cause any Distribution
+    # using this DistributionClass to be created in AWS CloudFront
+    cloudfront:
+      # Currently, you must specify cache and origin request policies,
+      # but we may update later to default to "Legacy" mode if these are
+      # not given
+      cachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+      originRequestPolicyId: cfe100f5-f591-430f-af4a-1336b47fc541
+      
+      # List of supported methods is currently required, but we may
+      # update to support a sensible default in future
+      supportedMethods:
+      - GET
+      - HEAD

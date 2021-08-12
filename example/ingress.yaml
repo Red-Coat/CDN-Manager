@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example-ingress
+  annotations:
+    # The presence of this annotation causes CDN-controller to create a
+    # Distribution from this Ingress. It will continue to watch the
+    # Ingress and sync any updates into the Distribution resource.
+    cdn.redcoat.dev/cluster-distribution-class: cloudfront-default
+spec:
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: a-service
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - example.com
+      secretName: example-com-tls-cert
+status:
+  loadBalancer:
+    ingress:
+      # These are managed automatically by your ingress controller.
+      # CDN-controller will use this hostname to automatically set the
+      # origin on the created Distribution
+      - hostname: 10-0-0-1.cloudprovider.example.net
+        ip: 10.0.0.1
