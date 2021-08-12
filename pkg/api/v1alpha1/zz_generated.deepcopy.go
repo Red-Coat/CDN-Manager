@@ -220,11 +220,6 @@ func (in *DistributionList) DeepCopyObject() runtime.Object {
 func (in *DistributionSpec) DeepCopyInto(out *DistributionSpec) {
 	*out = *in
 	out.DistributionClassRef = in.DistributionClassRef
-	if in.SupportedMethods != nil {
-		in, out := &in.SupportedMethods, &out.SupportedMethods
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	out.Origin = in.Origin
 	if in.Hosts != nil {
 		in, out := &in.Hosts, &out.Hosts

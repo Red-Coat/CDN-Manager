@@ -58,9 +58,7 @@ func NewDistributionProvider(
 // Calculates the Allowed and Cached methods for the CloudFront
 // Distribution
 //
-// The k8s Distribution tries to be relatively generic in the way it is
-// defined, so you can specify any list of supported HTTP Methods,
-// however CloudFront only supports limited subsets:
+// CloudFront only supports limited subsets:
 // - HEAD and GET only
 // - HEAD, GET and OPTIONS
 // - HEAD, GET, OPTIONS, POST, PUT, and DELETE
@@ -70,7 +68,7 @@ func NewDistributionProvider(
 // always cache OPTIONS, if it is set)
 func (c *DistributionProvider) calculateMethods() ([]string, []string) {
 	methods := []string{"HEAD", "GET"}
-	for _, header := range c.Distribution.Spec.SupportedMethods {
+	for _, header := range c.Class.SupportedMethods {
 		if header == "OPTIONS" {
 			methods = append(methods, "OPTIONS")
 		} else if header == "POST" || header == "PUT" || header == "DELETE" {

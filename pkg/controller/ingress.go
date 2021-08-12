@@ -136,7 +136,6 @@ func getDesiredDistribution(ingress networking.Ingress, class api.ObjectReferenc
 				HTTPPort:  80,
 				HTTPSPort: 443,
 			},
-			SupportedMethods: []string{"GET", "HEAD"},
 		},
 	}
 

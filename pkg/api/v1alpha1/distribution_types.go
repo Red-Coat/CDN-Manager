@@ -51,17 +51,6 @@ type DistributionSpec struct {
 	// distribution
 	DistributionClassRef ObjectReference `json:"distributionClass"`
 
-	// The list of HTTP methods to support. Others will be rejected with
-	// the CDN provider's native behaviour. NB: the controller can only
-	// guarantee that methods will work if they are "standard", eg
-	// CloudFront only supports HEAD, GET, OPTIONS, POST, PUT, DELETE.
-	//
-	// In addition, the controller cannot guarantee that methods you don't
-	// specify here _won't_ be accessible. For example, CloudFront only
-	// supports limited subsets, so if you specify any one of POST, PUT,
-	// or DELETE, all methods are enabled.
-	SupportedMethods []string `json:"supportedMethods"`
-
 	// Information about the "Origin" for the distribution, ie where the CDN
 	// should be setup to point to. We would normally expect this to be this
 	// kubernetes cluster, although it does not have to be.

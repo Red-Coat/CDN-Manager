@@ -54,6 +54,17 @@ type CloudFrontSpec struct {
 	// The Policy ID of the CloudFront Origin Request Policy you want to
 	// use on distributions
 	OriginRequestPolicyId string `json:"originRequestPolicyId"`
+
+	// The list of HTTP methods to support. Others will be rejected with
+	// the CDN provider's native behaviour. NB: the controller can only
+	// guarantee that methods will work if they are "standard", eg
+	// CloudFront only supports HEAD, GET, OPTIONS, POST, PUT, DELETE.
+	//
+	// In addition, the controller cannot guarantee that methods you don't
+	// specify here _won't_ be accessible. For example, CloudFront only
+	// supports limited subsets, so if you specify any one of POST, PUT,
+	// or DELETE, all methods are enabled.
+	SupportedMethods []string `json:"supportedMethods"`
 }
 
 // The status of a CloudFront Distribution, if one was requested by the
