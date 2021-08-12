@@ -153,7 +153,6 @@ func (r *DistributionReconciler) load(
 	err := r.Get(ctx, req.NamespacedName, &distro)
 
 	if err != nil {
-		r.log.V(-3).Error(err, "Could not load distribution")
 		return nil, nil
 	}
 
