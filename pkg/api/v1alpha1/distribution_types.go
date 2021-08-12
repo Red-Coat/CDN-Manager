@@ -88,11 +88,13 @@ type Origin struct {
 	// The port to target for HTTP requests. If not given, this defaults
 	// to 80.
 	// +kubebuilder:default=80
+	// +optional
 	HTTPPort int32 `json:"httpPort"`
 
 	// The port to target for HTTPS requests. If not given, this defaults
 	// to 443.
 	// +kubebuilder:default=443
+	// +optional
 	HTTPSPort int32 `json:"httpsPort"`
 }
 
