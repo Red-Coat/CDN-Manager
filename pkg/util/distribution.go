@@ -23,6 +23,31 @@ import (
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 )
 
+const (
+	AnnotationDistributionClass        = "cdn.redcoat.dev/distribution-class"
+	AnnotationClusterDistributionClass = "cdn.redcoat.dev/cluster-distribution-class"
+)
+
+// Looks at the annotations on the given object and tries to determine
+// the (Cluster)DistributionClass that is desired.
+func GetDistributionClass(object client.Object) *api.ObjectReference {
+	annotations := object.GetAnnotations()
+	if class := annotations[AnnotationDistributionClass]; class != "" {
+		return &api.ObjectReference{
+			Kind: "DistributionClass",
+			Name: class,
+		}
+	} else if class := annotations[AnnotationClusterDistributionClass]; class != "" {
+		return &api.ObjectReference{
+			Kind: "ClusterDistributionClass",
+			Name: class,
+		}
+	}
+
+	// No matching annotation found
+	return nil
+}
+
 // Adds the default metadata to the given Distribuition
 //
 // This is only called at creation, and not on update so that third

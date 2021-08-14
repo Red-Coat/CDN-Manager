@@ -29,11 +29,6 @@ import (
 	"git.redcoat.dev/cdn/pkg/util"
 )
 
-const (
-	AnnotationDistributionClass        = "cdn.redcoat.dev/distribution-class"
-	AnnotationClusterDistributionClass = "cdn.redcoat.dev/cluster-distribution-class"
-)
-
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
 type IngressReconciler struct {
@@ -62,7 +57,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var ingress networking.Ingress
 	r.Get(ctx, req.NamespacedName, &ingress)
 
-	class := getDistributionClass(ingress)
+	class := util.GetDistributionClass(&ingress)
 
 	if class == nil {
 		log.V(1).Info("Ignoring ingress without annotations")
@@ -103,26 +98,6 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// Looks at the annotations on the Ingress object and tries to determine
-// the (Cluster)DistributionClass that is desired.
-func getDistributionClass(ingress networking.Ingress) *api.ObjectReference {
-	annotations := ingress.GetAnnotations()
-	if class := annotations[AnnotationDistributionClass]; class != "" {
-		return &api.ObjectReference{
-			Kind: "DistributionClass",
-			Name: class,
-		}
-	} else if class := annotations[AnnotationClusterDistributionClass]; class != "" {
-		return &api.ObjectReference{
-			Kind: "ClusterDistributionClass",
-			Name: class,
-		}
-	}
-
-	// No matching annotation found
-	return nil
 }
 
 // Returns a Distribution with the desired Spec for this Ingress
