@@ -18,7 +18,28 @@ package util
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
+	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 )
+
+// Convienience function which returns a Distribution with default http
+// and https ports set, and the host set from the given
+// LoadBalancerIngress slice.
+func DistributionFromIngress(
+	class api.ObjectReference,
+	ingress []corev1.LoadBalancerIngress,
+) api.Distribution {
+	return api.Distribution{
+		Spec: api.DistributionSpec{
+			DistributionClassRef: class,
+			Origin: api.Origin{
+				Host:      GetIngressHost(ingress),
+				HTTPPort:  80,
+				HTTPSPort: 443,
+			},
+		},
+	}
+}
 
 // Checks to see if a LoadBalancerIngress[] resource has any values and
 // uses this as the origin hostname if it does

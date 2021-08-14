@@ -128,16 +128,7 @@ func getDistributionClass(ingress networking.Ingress) *api.ObjectReference {
 
 // Returns a Distribution with the desired Spec for this Ingress
 func getDesiredDistribution(ingress networking.Ingress, class api.ObjectReference) api.Distribution {
-	desired := api.Distribution{
-		Spec: api.DistributionSpec{
-			DistributionClassRef: class,
-			Origin: api.Origin{
-				Host:      util.GetIngressHost(ingress.Status.LoadBalancer.Ingress),
-				HTTPPort:  80,
-				HTTPSPort: 443,
-			},
-		},
-	}
+	desired := util.DistributionFromIngress(class, ingress.Status.LoadBalancer.Ingress)
 
 	// Currently only one TLS certificate is supported and hosts are only
 	// added if TLS is enabled.
