@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	networking "k8s.io/api/networking/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,7 +80,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if len(distros.Items) == 0 {
 		desired := getDesiredDistribution(ingress, *class)
-		addDistributionMeta(ingress, &desired)
+		util.AddDistributionMeta(&ingress, &desired)
 
 		err := r.Create(ctx, &desired)
 		if err != nil {
@@ -144,26 +143,4 @@ func getDesiredDistribution(ingress networking.Ingress, class api.ObjectReferenc
 	}
 
 	return desired
-}
-
-// Adds the default metadata to the given Distribuition
-//
-// This is only called at creation, and not on update so that third
-// party annotations, finalizers, etc, are not cleared.
-func addDistributionMeta(ingress networking.Ingress, distro *api.Distribution) {
-	distro.SetName(ingress.GetName())
-	distro.SetLabels(ingress.GetLabels())
-	distro.SetNamespace(ingress.GetNamespace())
-
-	// Controller needs to be a *bool so we'll define the value here and
-	// then pass the reference
-	truth := true
-	kind := ingress.GetObjectKind().GroupVersionKind()
-	distro.SetOwnerReferences([]meta.OwnerReference{meta.OwnerReference{
-		APIVersion: kind.Group + "/" + kind.Version,
-		Kind:       kind.Kind,
-		Name:       ingress.GetName(),
-		UID:        ingress.GetUID(),
-		Controller: &truth,
-	}})
 }
