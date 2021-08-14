@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,16 +37,19 @@ type IngressReconciler struct {
 
 	// The current scheme we are working with
 	Scheme *runtime.Scheme
+
+	IngressService *client.ObjectKey
 }
 
 // Creates a new IngressController
-func NewIngressController(mgr ctrl.Manager) error {
+func NewIngressController(mgr ctrl.Manager, ingressService string) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networking.Ingress{}).
 		Owns(&api.Distribution{}).
 		Complete(&IngressReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:         mgr.GetClient(),
+			Scheme:         mgr.GetScheme(),
+			IngressService: util.ObjectKeyFromString(ingressService),
 		})
 }
 
@@ -74,7 +78,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	)
 
 	if len(distros.Items) == 0 {
-		desired := getDesiredDistribution(ingress, *class)
+		desired := r.getDesiredDistribution(ingress, *class)
 		util.AddDistributionMeta(&ingress, &desired)
 
 		err := r.Create(ctx, &desired)
@@ -83,7 +87,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	} else if len(distros.Items) == 1 {
 		distro := distros.Items[0]
-		desired := getDesiredDistribution(ingress, *class)
+		desired := r.getDesiredDistribution(ingress, *class)
 		if !reflect.DeepEqual(desired.Spec, distro.Spec) {
 			log.V(1).Info("Distribution is out of sync!")
 
@@ -101,8 +105,20 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Returns a Distribution with the desired Spec for this Ingress
-func getDesiredDistribution(ingress networking.Ingress, class api.ObjectReference) api.Distribution {
-	desired := util.DistributionFromIngress(class, ingress.Status.LoadBalancer.Ingress)
+func (r *IngressReconciler) getDesiredDistribution(
+	ingress networking.Ingress,
+	class api.ObjectReference,
+) api.Distribution {
+	var ingressLB []corev1.LoadBalancerIngress
+	if r.IngressService == nil {
+		ingressLB = ingress.Status.LoadBalancer.Ingress
+	} else {
+		var svc corev1.Service
+		r.Get(context.TODO(), *r.IngressService, &svc)
+		ingressLB = svc.Status.LoadBalancer.Ingress
+	}
+
+	desired := util.DistributionFromIngress(class, ingressLB)
 
 	// Currently only one TLS certificate is supported and hosts are only
 	// added if TLS is enabled.
