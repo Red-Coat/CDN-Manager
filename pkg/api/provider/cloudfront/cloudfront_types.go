@@ -48,12 +48,16 @@ type CloudFrontSpec struct {
 	SSLMode string `json:"sslMode"`
 
 	// The Policy ID of the CloudFront Cache Policy you want to use on
-	// distributions
-	CachePolicyId string `json:"cachePolicyId"`
+	// distributions. This value is normally optional, but required if you
+	// want to set an originRequestPolicyId.
+	// +optional
+	CachePolicyId string `json:"cachePolicyId,omitempty"`
 
 	// The Policy ID of the CloudFront Origin Request Policy you want to
-	// use on distributions
-	OriginRequestPolicyId string `json:"originRequestPolicyId"`
+	// use on distributions. If you specify this value, cachePolicyId is
+	// required.
+	// +optional
+	OriginRequestPolicyId string `json:"originRequestPolicyId,omitempty"`
 
 	// The list of HTTP methods to support. Others will be rejected with
 	// the CDN provider's native behaviour. NB: the controller can only

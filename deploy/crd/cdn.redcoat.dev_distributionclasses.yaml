@@ -58,11 +58,13 @@ spec:
                         type: string
                       cachePolicyId:
                         description: The Policy ID of the CloudFront Cache Policy
-                          you want to use on distributions
+                          you want to use on distributions. This value is normally
+                          optional, but required if you want to set an originRequestPolicyId.
                         type: string
                       originRequestPolicyId:
                         description: The Policy ID of the CloudFront Origin Request
-                          Policy you want to use on distributions
+                          Policy you want to use on distributions. If you specify
+                          this value, cachePolicyId is required.
                         type: string
                       secretAccessKeySecretRef:
                         description: The SecretAccessKey is used for authentication.
@@ -106,8 +108,6 @@ spec:
                           type: string
                         type: array
                     required:
-                    - cachePolicyId
-                    - originRequestPolicyId
                     - supportedMethods
                     type: object
                 type: object

@@ -7,9 +7,10 @@ spec:
     # The presence of the "cloudfront" block will cause any Distribution
     # using this DistributionClass to be created in AWS CloudFront
     cloudfront:
-      # Currently, you must specify cache and origin request policies,
-      # but we may update later to default to "Legacy" mode if these are
-      # not given
+      # The following are optional - if set, these will be set on any
+      # created Distributions.
+      # If not set, the Distribution will fall back into "Legacy" mode
+      # and set best guess reasonable default cache rules.
       cachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
       originRequestPolicyId: cfe100f5-f591-430f-af4a-1336b47fc541
       

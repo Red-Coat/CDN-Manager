@@ -126,6 +126,49 @@ func (c *DistributionProvider) calculateAliases() *cloudfront.Aliases {
 	return &aliases
 }
 
+// Calculates the desired forwarded values for the distribution
+func (c *DistributionProvider) calculateForwardedValues() *cloudfront.ForwardedValues {
+	// If a cache policy id is set then this takes precendence. We will
+	// hope that it has been setup appropriately to forward the host
+	// header.
+	if c.Class.CachePolicyId != "" {
+		return nil
+	}
+
+	return &cloudfront.ForwardedValues{
+		// Best guess defaults - if you want to change these, set a cache
+		// policy / origin request policy
+		Cookies: &cloudfront.CookiePreference{
+			Forward: aws.String(cloudfront.ItemSelectionNone),
+		},
+		QueryString: aws.Bool(true),
+		QueryStringCacheKeys: &cloudfront.QueryStringCacheKeys{
+			Quantity: aws.Int64(0),
+		},
+		Headers: &cloudfront.Headers{
+			Quantity: aws.Int64(1),
+			// We _have_ to forward the Host header so that the ingress
+			// controller knows what to do with it
+			Items: aws.StringSlice([]string{"Host"}),
+		},
+	}
+}
+
+// Calculates the TTLs to set on the distribution
+//
+// If a Cache Policy Id has been set, this will just return nils. If
+// not, it will return the AWS default TTLs.
+func (c *DistributionProvider) calculateTTLs() (*int64, *int64, *int64) {
+	// If a cache policy id is set, we don't need to set the TTLs on the
+	// distribution itself, so we'll just return nil
+	if c.Class.CachePolicyId != "" {
+		return nil, nil, nil
+	}
+
+	// AWS' default TTL settings
+	return aws.Int64(0), aws.Int64(31536000), aws.Int64(86400)
+}
+
 // Calculates the full desired state of the CloudFront Distribution
 //
 // This is used to create new Distributions, to compare against existing
@@ -133,6 +176,7 @@ func (c *DistributionProvider) calculateAliases() *cloudfront.Aliases {
 // match.
 func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 	supportedMethods, cachedMethods := c.calculateMethods()
+	minTTL, maxTTL, defaultTTL := c.calculateTTLs()
 
 	c.DesiredState = &cloudfront.DistributionConfig{
 		CallerReference: aws.String(string(c.Distribution.UID)),
@@ -194,8 +238,12 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 			TargetOriginId:        aws.String(c.Distribution.Spec.Origin.Host),
 			ViewerProtocolPolicy:  aws.String(c.calculateViewerPolicy()),
 			Compress:              aws.Bool(true),
-			CachePolicyId:         aws.String(c.Class.CachePolicyId),
-			OriginRequestPolicyId: aws.String(c.Class.OriginRequestPolicyId),
+			CachePolicyId:         stringOrNil(c.Class.CachePolicyId),
+			OriginRequestPolicyId: stringOrNil(c.Class.OriginRequestPolicyId),
+			ForwardedValues:       c.calculateForwardedValues(),
+			MinTTL:                minTTL,
+			MaxTTL:                maxTTL,
+			DefaultTTL:            defaultTTL,
 			// Required By AWS
 			SmoothStreaming:        aws.Bool(false),
 			FieldLevelEncryptionId: aws.String(""),
@@ -398,5 +446,18 @@ func (c *DistributionProvider) Delete() error {
 		c.removeCloudFrontEndpoints()
 
 		return nil
+	}
+}
+
+// stringOrNil checks to see if a string has any value - if it does, it
+// returns a pointer to the string. If it doesn't (ie it is an empty
+// string), it returns nil.
+//
+// This is useful for AWS' weird-ass everything-is-a-pointer SDK.
+func stringOrNil(value string) *string {
+	if value == "" {
+		return nil
+	} else {
+		return &value
 	}
 }
