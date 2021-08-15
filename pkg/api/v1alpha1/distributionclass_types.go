@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
+	cfapi "git.redcoat.dev/cdn/pkg/provider/cloudfront/api/v1alpha1"
 )
 
 func init() {
@@ -71,7 +71,7 @@ type ProviderList struct {
 	// environment variables, or using AWS' IAM Roles For Service Accounts
 	// (IRSA) Controller.
 	// +optional
-	CloudFront *cloudfront.CloudFrontSpec `json:"cloudfront,omitempty"`
+	CloudFront *cfapi.CloudFrontSpec `json:"cloudfront,omitempty"`
 }
 
 // DistributionClassList contains a list of DistributionClasses

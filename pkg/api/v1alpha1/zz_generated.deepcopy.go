@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"git.redcoat.dev/cdn/pkg/api/provider/cloudfront"
+	apiv1alpha1 "git.redcoat.dev/cdn/pkg/provider/cloudfront/api/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -314,7 +314,7 @@ func (in *ProviderList) DeepCopyInto(out *ProviderList) {
 	*out = *in
 	if in.CloudFront != nil {
 		in, out := &in.CloudFront, &out.CloudFront
-		*out = new(cloudfront.CloudFrontSpec)
+		*out = new(apiv1alpha1.CloudFrontSpec)
 		(*in).DeepCopyInto(*out)
 	}
 }
