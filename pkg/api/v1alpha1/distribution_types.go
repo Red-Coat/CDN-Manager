@@ -83,7 +83,7 @@ type Origin struct {
 	// If you specify this, this takes precendence over any detected
 	// ingress load balancer hostnames. Use this to override the target's
 	// hostname, or if you have not specified a kubernetes target.
-	Host string `json:"host,omitempty"`
+	Host string `json:"host"`
 
 	// The port to target for HTTP requests. If not given, this defaults
 	// to 80.

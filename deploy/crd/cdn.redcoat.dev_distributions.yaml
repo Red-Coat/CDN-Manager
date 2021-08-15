@@ -101,6 +101,8 @@ spec:
                       this defaults to 443.
                     format: int32
                     type: integer
+                required:
+                - host
                 type: object
               tls:
                 description: The TLS configuration for this distribution (eg the secret
