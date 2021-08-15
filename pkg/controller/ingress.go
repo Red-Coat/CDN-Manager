@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
+	"git.redcoat.dev/cdn/pkg/resolver"
 	"git.redcoat.dev/cdn/pkg/util"
 )
 
@@ -61,7 +62,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var ingress networking.Ingress
 	r.Get(ctx, req.NamespacedName, &ingress)
 
-	class := util.GetDistributionClass(&ingress)
+	class := resolver.GetDistributionClass(&ingress)
 
 	if class == nil {
 		log.V(1).Info("Ignoring ingress without annotations")
@@ -84,7 +85,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if len(distros.Items) == 0 {
-		util.AddDistributionMeta(&ingress, &desired)
+		resolver.AddDistributionMeta(&ingress, &desired)
 
 		err := r.Create(ctx, &desired)
 		if err != nil {
@@ -122,7 +123,7 @@ func (r *IngressReconciler) getDesiredDistribution(
 		ingressLB = svc.Status.LoadBalancer.Ingress
 	}
 
-	desired := util.DistributionFromIngress(class, ingressLB)
+	desired := resolver.DistributionFromIngress(class, ingressLB)
 
 	// Currently only one TLS certificate is supported and hosts are only
 	// added if TLS is enabled.
