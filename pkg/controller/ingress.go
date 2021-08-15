@@ -77,8 +77,13 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		client.MatchingLabels(ingress.GetLabels()),
 	)
 
+	desired := r.getDesiredDistribution(ingress, *class)
+	if desired.Spec.Origin.Host == "" {
+		log.V(-1).Info("Unable to determine origin for ingress. Skipping")
+		return ctrl.Result{}, nil
+	}
+
 	if len(distros.Items) == 0 {
-		desired := r.getDesiredDistribution(ingress, *class)
 		util.AddDistributionMeta(&ingress, &desired)
 
 		err := r.Create(ctx, &desired)
@@ -87,7 +92,6 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	} else if len(distros.Items) == 1 {
 		distro := distros.Items[0]
-		desired := r.getDesiredDistribution(ingress, *class)
 		if !reflect.DeepEqual(desired.Spec, distro.Spec) {
 			log.V(1).Info("Distribution is out of sync!")
 
