@@ -25,14 +25,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
+	"git.redcoat.dev/cdn/pkg/handler"
 	"git.redcoat.dev/cdn/pkg/provider"
 	"git.redcoat.dev/cdn/pkg/provider/cloudfront"
 	"git.redcoat.dev/cdn/pkg/resolver"
@@ -78,24 +77,39 @@ type DistributionReconciler struct {
 // SetupWithManager sets up the controller with the Manager.
 func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 	client := mgr.GetClient()
-	reconciller := DistributionReconciler{
-		Client:              client,
-		Scheme:              mgr.GetScheme(),
-		Logger:              logger.WithName("ctrl"),
-		CertificateResolver: resolver.CertificateResolver{Client: client},
-		Providers: []provider.CDNProvider{
-			cloudfront.CloudFrontProvider{},
-		},
-	}
 
-	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
-
-	log := reconciller.Logger.WithName("watch")
-	watch(log, builder, mgr, &api.DistributionClass{}, true)
-	watch(log, builder, mgr, &api.ClusterDistributionClass{}, false)
-	watch(log, builder, mgr, &corev1.Secret{}, true)
-
-	return builder.Complete(&reconciller)
+	return ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{}).
+		Watches(
+			&source.Kind{Type: &api.DistributionClass{}},
+			&handler.EnqueueRequestForIndexedReference{
+				Client: client,
+				Field:  "DistributionClass",
+			},
+		).
+		Watches(
+			&source.Kind{Type: &api.ClusterDistributionClass{}},
+			&handler.EnqueueRequestForIndexedReference{
+				Client:       client,
+				Field:        "ClusterDistributionClass",
+				ClusterScope: true,
+			},
+		).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			&handler.EnqueueRequestForIndexedReference{
+				Client: client,
+				Field:  "Secret",
+			},
+		).
+		Complete(&DistributionReconciler{
+			Client:              client,
+			Scheme:              mgr.GetScheme(),
+			Logger:              logger.WithName("ctrl"),
+			CertificateResolver: resolver.CertificateResolver{Client: client},
+			Providers: []provider.CDNProvider{
+				cloudfront.CloudFrontProvider{},
+			},
+		})
 }
 
 // Main function called when a reconciliation is required
@@ -297,53 +311,4 @@ func (r *DistributionReconciler) requeueIfNotReady(result *ctrl.Result, conditio
 		r.log.Info("Resource is not in desired state. Scheduling recheck in 1m")
 		result.RequeueAfter, _ = time.ParseDuration("1m")
 	}
-}
-
-// Sets up the controller to watch one of the resources that
-// Distribution objects reference
-//
-// This needs to perform two main tasks: setting up an index on the
-// Distributions for the value that they reference, so that they can
-// easily be listed, and watching the depended upon resources and
-// queueing distribution changes accordingly.
-func watch(
-	log logr.Logger,
-	builder *builder.Builder,
-	mgr ctrl.Manager,
-	kind client.Object,
-	namespaced bool,
-) {
-	kindName := reflect.TypeOf(kind).Elem().Name()
-	ctx := context.Background()
-	log = log.WithValues("kind", kindName)
-
-	builder.Watches(
-		&source.Kind{Type: kind},
-		handler.EnqueueRequestsFromMapFunc(
-			func(object client.Object) []ctrl.Request {
-				log := log.WithValues("resource", client.ObjectKeyFromObject(object))
-				log.V(2).Info("Detected change")
-
-				var distroList api.DistributionList
-				predicate := client.MatchingFields{kindName: object.GetName()}
-
-				if namespaced {
-					mgr.GetClient().List(ctx, &distroList, predicate,
-						client.InNamespace(object.GetNamespace()),
-					)
-				} else {
-					mgr.GetClient().List(ctx, &distroList, predicate)
-				}
-
-				requests := make([]ctrl.Request, len(distroList.Items))
-				for i, distro := range distroList.Items {
-					key := client.ObjectKeyFromObject(&distro)
-					log.V(1).Info("Queuing Reconcilliation", "distribution", key.String())
-					requests[i] = ctrl.Request{NamespacedName: key}
-				}
-
-				return requests
-			},
-		),
-	)
 }
