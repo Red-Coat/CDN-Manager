@@ -91,9 +91,9 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 	builder := ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{})
 
 	log := reconciller.Logger.WithName("watch")
-	watch(log, builder, mgr, &api.DistributionClass{}, getDistributionClassRef, true)
-	watch(log, builder, mgr, &api.ClusterDistributionClass{}, getDistributionClassRef, false)
-	watch(log, builder, mgr, &corev1.Secret{}, getSecretRef, true)
+	watch(log, builder, mgr, &api.DistributionClass{}, true)
+	watch(log, builder, mgr, &api.ClusterDistributionClass{}, false)
+	watch(log, builder, mgr, &corev1.Secret{}, true)
 
 	return builder.Complete(&reconciller)
 }
@@ -311,28 +311,11 @@ func watch(
 	builder *builder.Builder,
 	mgr ctrl.Manager,
 	kind client.Object,
-	cache func(*api.Distribution) *api.ObjectReference,
 	namespaced bool,
 ) {
 	kindName := reflect.TypeOf(kind).Elem().Name()
 	ctx := context.Background()
 	log = log.WithValues("kind", kindName)
-
-	mgr.GetFieldIndexer().IndexField(ctx, &api.Distribution{}, kindName,
-		func(object client.Object) []string {
-			ref := cache(object.(*api.Distribution))
-			if ref != nil && ref.Kind == kindName {
-				log.V(2).Info(
-					"Indexing Distribution",
-					"ref", ref.Name,
-					"distribution", client.ObjectKeyFromObject(object).String(),
-				)
-				return []string{ref.Name}
-			} else {
-				return []string{}
-			}
-		},
-	)
 
 	builder.Watches(
 		&source.Kind{Type: kind},
@@ -363,27 +346,4 @@ func watch(
 			},
 		),
 	)
-}
-
-// Gets the DistributionClass Object Reference
-//
-// Used to setup index fields
-func getDistributionClassRef(distro *api.Distribution) *api.ObjectReference {
-	return &distro.Spec.DistributionClassRef
-}
-
-// Gets the SecretRef field and return this as an Object Reference
-//
-// Used to setup index fields
-func getSecretRef(distro *api.Distribution) *api.ObjectReference {
-	if tlsSpec := distro.Spec.TLS; tlsSpec != nil {
-		if secret := tlsSpec.SecretRef; secret != "" {
-			return &api.ObjectReference{
-				Kind: "Secret",
-				Name: secret,
-			}
-		}
-	}
-
-	return nil
 }

@@ -33,6 +33,7 @@ import (
 
 	cdnv1alpha1 "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/controller"
+	"git.redcoat.dev/cdn/pkg/indexer"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,6 +81,8 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	indexer.SetUpDistributionIndexers(mgr)
 
 	if err = controller.NewDistributionController(mgr, log); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Distribution")
