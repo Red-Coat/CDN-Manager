@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
 	"git.redcoat.dev/cdn/pkg/handler"
@@ -79,28 +78,9 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 	client := mgr.GetClient()
 
 	return ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{}).
-		Watches(
-			&source.Kind{Type: &api.DistributionClass{}},
-			&handler.EnqueueRequestForIndexedReference{
-				Client: client,
-				Field:  "DistributionClass",
-			},
-		).
-		Watches(
-			&source.Kind{Type: &api.ClusterDistributionClass{}},
-			&handler.EnqueueRequestForIndexedReference{
-				Client:       client,
-				Field:        "ClusterDistributionClass",
-				ClusterScope: true,
-			},
-		).
-		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
-			&handler.EnqueueRequestForIndexedReference{
-				Client: client,
-				Field:  "Secret",
-			},
-		).
+		Watches(handler.BuildIndexedReferenceWatcher(client, &api.DistributionClass{})).
+		Watches(handler.BuildIndexedReferenceWatcher(client, &api.ClusterDistributionClass{})).
+		Watches(handler.BuildIndexedReferenceWatcher(client, &corev1.Secret{})).
 		Complete(&DistributionReconciler{
 			Client:              client,
 			Scheme:              mgr.GetScheme(),
