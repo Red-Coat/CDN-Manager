@@ -98,16 +98,13 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	r.log.Info("Reconcilliation")
 
 	var distro api.Distribution
-	err := r.Get(ctx, req.NamespacedName, &distro)
-
-	if distro.GetUID() == "" {
-		return ctrl.Result{}, nil
+	if err := r.Get(ctx, req.NamespacedName, &distro); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	class, err := r.GetDistributionClassSpec(ctx, distro.Spec.DistributionClassRef, &distro)
-
 	if err != nil {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if distro.ObjectMeta.DeletionTimestamp.IsZero() {
