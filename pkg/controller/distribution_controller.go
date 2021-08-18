@@ -23,7 +23,6 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -53,10 +52,7 @@ const finalizer = "cdn.redcoat.dev/finalizer"
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributionclasses,verbs=get;watch
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=clusterdistributionclasses,verbs=get;watch
 type DistributionReconciler struct {
-	client.Client
-
-	// The current scheme we are working with
-	Scheme *runtime.Scheme
+	resolver.DistributionClassReader
 
 	// Used to load the required certificate for the distribution's TLS
 	// settings
@@ -82,10 +78,9 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(handler.BuildIndexedReferenceWatcher(client, &api.ClusterDistributionClass{})).
 		Watches(handler.BuildIndexedReferenceWatcher(client, &corev1.Secret{})).
 		Complete(&DistributionReconciler{
-			Client:              client,
-			Scheme:              mgr.GetScheme(),
-			Logger:              logger.WithName("ctrl"),
-			CertificateResolver: resolver.CertificateResolver{Client: client},
+			DistributionClassReader: resolver.DistributionClassReader{Client: client},
+			Logger:                  logger.WithName("ctrl"),
+			CertificateResolver:     resolver.CertificateResolver{Client: client},
 			Providers: []provider.CDNProvider{
 				cloudfront.CloudFrontProvider{},
 			},
@@ -102,78 +97,41 @@ func (r *DistributionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	r.log = r.Logger.WithValues("distribution", req.Namespace+"/"+req.Name)
 	r.log.Info("Reconcilliation")
 
-	distro, class := r.load(ctx, req)
+	var distro api.Distribution
+	err := r.Get(ctx, req.NamespacedName, &distro)
 
-	if distro == nil {
+	if distro.GetUID() == "" {
+		return ctrl.Result{}, nil
+	}
+
+	class, err := r.GetDistributionClassSpec(ctx, distro.Spec.DistributionClassRef, &distro)
+
+	if err != nil {
 		return ctrl.Result{}, nil
 	}
 
 	if distro.ObjectMeta.DeletionTimestamp.IsZero() {
 		r.log.V(1).Info("Starting Reconcilliation Loop")
-		if !controllerutil.ContainsFinalizer(distro, finalizer) {
-			controllerutil.AddFinalizer(distro, finalizer)
-			r.Update(ctx, distro)
+		if !controllerutil.ContainsFinalizer(&distro, finalizer) {
+			controllerutil.AddFinalizer(&distro, finalizer)
+			r.Update(ctx, &distro)
 		}
 
-		return r.reconcileProviders(ctx, *class, *distro), nil
-	} else if controllerutil.ContainsFinalizer(distro, finalizer) {
+		return r.reconcileProviders(ctx, *class, distro), nil
+	} else if controllerutil.ContainsFinalizer(&distro, finalizer) {
 		r.log.V(1).Info("Starting Deletion Loop")
-		allDeleted, result := r.deleteProviders(ctx, *class, *distro)
+		allDeleted, result := r.deleteProviders(ctx, *class, distro)
 
 		if allDeleted {
 			r.log.Info("Deletion Complete. Removing Fianlizer")
-			controllerutil.RemoveFinalizer(distro, finalizer)
-			r.Update(ctx, distro)
+			controllerutil.RemoveFinalizer(&distro, finalizer)
+			r.Update(ctx, &distro)
 		}
 
 		return result, nil
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// Loads a k8s Distribution and the DistributionClassSpec for its
-// referenced distribution class
-//
-// The reason this gives the _spec_ for the distribution class is that
-// it'll load either the ClusterDistributionClass or the namespaced
-// DistributionClass, depending on which is referenced.
-func (r *DistributionReconciler) load(
-	ctx context.Context,
-	req ctrl.Request,
-) (*api.Distribution, *api.DistributionClassSpec) {
-	var distro api.Distribution
-	var class api.DistributionClassSpec
-	err := r.Get(ctx, req.NamespacedName, &distro)
-
-	if err != nil {
-		return nil, nil
-	}
-
-	r.log = r.log.WithValues("class", distro.Spec.DistributionClassRef.Name)
-	r.log.V(1).Info(distro.Spec.DistributionClassRef.Kind)
-
-	if distro.Spec.DistributionClassRef.Kind == "ClusterDistributionClass" {
-		var parent api.ClusterDistributionClass
-		err = r.Get(ctx, client.ObjectKey{
-			Name: distro.Spec.DistributionClassRef.Name,
-		}, &parent)
-		class = parent.Spec
-	} else {
-		var parent api.DistributionClass
-		err = r.Get(ctx, client.ObjectKey{
-			Namespace: distro.Namespace,
-			Name:      distro.Spec.DistributionClassRef.Name,
-		}, &parent)
-		class = parent.Spec
-	}
-
-	if err != nil {
-		r.log.V(-3).Error(err, "Could not load distribution class")
-		return nil, nil
-	}
-
-	return &distro, &class
 }
 
 // Loops over the Providers and asks each one to reconicle if it has
