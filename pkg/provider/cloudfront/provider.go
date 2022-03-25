@@ -20,8 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 
-	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/resolver"
+	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/resolver"
 )
 
 type CloudFrontProvider struct {

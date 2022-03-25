@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	cdnv1alpha1 "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/controller"
-	"git.redcoat.dev/cdn/pkg/indexer"
+	cdnv1alpha1 "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/controller"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/indexer"
 	//+kubebuilder:scaffold:imports
 )
 

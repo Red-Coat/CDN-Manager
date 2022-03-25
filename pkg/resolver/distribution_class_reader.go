@@ -22,7 +22,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
+	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
 )
 
 // A DistributionClassReader is a kind of client.Reader which is

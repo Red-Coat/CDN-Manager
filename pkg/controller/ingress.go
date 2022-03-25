@@ -26,9 +26,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/resolver"
-	"git.redcoat.dev/cdn/pkg/util"
+	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/resolver"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/util"
 )
 
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update

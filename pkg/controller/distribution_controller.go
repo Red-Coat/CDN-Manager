@@ -28,11 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
-	"git.redcoat.dev/cdn/pkg/handler"
-	"git.redcoat.dev/cdn/pkg/provider"
-	"git.redcoat.dev/cdn/pkg/provider/cloudfront"
-	"git.redcoat.dev/cdn/pkg/resolver"
+	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/handler"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/provider"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/provider/cloudfront"
+	"gitlab.com/redcoat/k8s-cdn-controller/pkg/resolver"
 )
 
 // The name of the finalizer used by this controller to manage the

@@ -19,7 +19,7 @@ package resolver
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
+	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
 )
 
 // Convienience function which returns a Distribution with default http

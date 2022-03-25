@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	api "git.redcoat.dev/cdn/pkg/api/v1alpha1"
+	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
 )
 
 type EnqueueRequestForIndexedReference struct {
