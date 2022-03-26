@@ -32,7 +32,8 @@ import (
 )
 
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;watch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;watch;list
+
 type IngressReconciler struct {
 	client.Client
 

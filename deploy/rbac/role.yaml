@@ -12,6 +12,7 @@ rules:
   - clusterdistributionclasses
   verbs:
   - get
+  - list
   - watch
 - apiGroups:
   - cdn.redcoat.dev
@@ -19,6 +20,7 @@ rules:
   - distributionclasses
   verbs:
   - get
+  - list
   - watch
 - apiGroups:
   - cdn.redcoat.dev
@@ -47,16 +49,18 @@ rules:
   - patch
   - update
 - apiGroups:
-  - networking
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
   resources:
   - ingresses
   verbs:
   - get
-  - watch
-- apiGroups:
-  - v1
-  resources:
-  - services
-  verbs:
-  - get
+  - list
   - watch

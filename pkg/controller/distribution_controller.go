@@ -49,8 +49,10 @@ const finalizer = "cdn.redcoat.dev/finalizer"
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributions/finalizers,verbs=update
-// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributionclasses,verbs=get;watch
-// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=clusterdistributionclasses,verbs=get;watch
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=distributionclasses,verbs=get;watch;list
+// +kubebuilder:rbac:groups=cdn.redcoat.dev,resources=clusterdistributionclasses,verbs=get;watch;list
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;watch;list
+
 type DistributionReconciler struct {
 	resolver.DistributionClassReader
 
