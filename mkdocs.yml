@@ -1,0 +1,6 @@
+site_name: CDN Manager
+theme:
+  name: material
+  palette:
+    primary: deep orange
+    accent: orange
