@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	apiv1alpha1 "gitlab.com/redcoat/k8s-cdn-controller/pkg/provider/cloudfront/api/v1alpha1"
+	apiv1alpha1 "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 

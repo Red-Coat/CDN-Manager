@@ -25,8 +25,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 
-	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
-	cfapi "gitlab.com/redcoat/k8s-cdn-controller/pkg/provider/cloudfront/api/v1alpha1"
+	api "gitlab.com/redcoat/cdn-manager/pkg/api/v1alpha1"
+	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
 type DistributionProvider struct {

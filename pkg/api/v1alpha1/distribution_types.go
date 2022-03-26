@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	cfapi "gitlab.com/redcoat/k8s-cdn-controller/pkg/provider/cloudfront/api/v1alpha1"
+	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
 func init() {

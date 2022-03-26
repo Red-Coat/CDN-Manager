@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	cdnv1alpha1 "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
+	cdnv1alpha1 "gitlab.com/redcoat/cdn-manager/pkg/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

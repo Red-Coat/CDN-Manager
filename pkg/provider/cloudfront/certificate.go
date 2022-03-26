@@ -23,8 +23,8 @@ import (
 	"regexp"
 	"strings"
 
-	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
-	"gitlab.com/redcoat/k8s-cdn-controller/pkg/resolver"
+	api "gitlab.com/redcoat/cdn-manager/pkg/api/v1alpha1"
+	"gitlab.com/redcoat/cdn-manager/pkg/resolver"
 )
 
 type CertificateProvider struct {

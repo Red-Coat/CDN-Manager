@@ -16,8 +16,8 @@ limitations under the License.
 package provider
 
 import (
-	api "gitlab.com/redcoat/k8s-cdn-controller/pkg/api/v1alpha1"
-	"gitlab.com/redcoat/k8s-cdn-controller/pkg/resolver"
+	api "gitlab.com/redcoat/cdn-manager/pkg/api/v1alpha1"
+	"gitlab.com/redcoat/cdn-manager/pkg/resolver"
 )
 
 // A CDNProvider is the top level logic holder for a CDN integration (eg

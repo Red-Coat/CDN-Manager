@@ -1,4 +1,4 @@
-module gitlab.com/redcoat/k8s-cdn-controller
+module gitlab.com/redcoat/cdn-manager
 
 go 1.16
 

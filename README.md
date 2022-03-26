@@ -1,7 +1,11 @@
-# K8s CDN Controller
+# CDN Manager
 
-The CDN Controller is a kubernetes addon which sets up Distributions in
-CDNs automatically pointing to ingress / service resources.
+CDN Manager lets you manage your CDN Distributions via Kubernetes
+resources, and syncs ingresses, load balancers and certificate settings
+automatically for you.
+
+It currently only support [AWS CloudFront][2], however support for other
+platforms may be added at a later date.
 
 Its technical design has drawn some inspiration from [cert-manager][1].
 
@@ -11,3 +15,4 @@ supported, and things may change without notice.**
 
 
 [1]: https://github.com/jetstack/cert-manager
+[2]: https://aws.amazon.com/cloudfront/
