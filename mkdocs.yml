@@ -1,4 +1,6 @@
 site_name: CDN Manager
+repo_url: https://gitlab.com/redcoat/cdn-manager
+repo_name: CDN Manager @ GitLab
 theme:
   name: material
   palette:
