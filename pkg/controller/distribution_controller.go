@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -75,6 +76,15 @@ type DistributionReconciler struct {
 func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 	client := mgr.GetClient()
 
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+	cloudfront, err := cloudfront.New(clientset.CoreV1())
+	if err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).For(&api.Distribution{}).
 		Watches(handler.BuildIndexedReferenceWatcher(client, &api.DistributionClass{})).
 		Watches(handler.BuildIndexedReferenceWatcher(client, &api.ClusterDistributionClass{})).
@@ -84,7 +94,7 @@ func NewDistributionController(mgr ctrl.Manager, logger logr.Logger) error {
 			Logger:                  logger.WithName("ctrl"),
 			CertificateResolver:     resolver.CertificateResolver{Client: client},
 			Providers: []provider.CDNProvider{
-				cloudfront.CloudFrontProvider{},
+				cloudfront,
 			},
 		})
 }

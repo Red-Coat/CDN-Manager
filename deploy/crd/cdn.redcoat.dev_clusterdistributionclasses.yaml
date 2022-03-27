@@ -51,11 +51,47 @@ spec:
                       environment variables, or using AWS' IAM Roles For Service Accounts
                       (IRSA) Controller.
                     properties:
-                      accessKeyID:
-                        description: 'The AccessKeyID is used for authentication.
-                          If not set we fall-back to using env vars, shared credentials
-                          file or AWS Instance metadata see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials'
-                        type: string
+                      auth:
+                        description: Details on how to authenticate with the AWS API.
+                          If this is not specified, we will fall back to the ambient
+                          credentials given to the controller pod.
+                        properties:
+                          accessKeySecret:
+                            description: A reference to a kuberenetes resource, possibly
+                              in another namespace
+                            properties:
+                              name:
+                                type: string
+                              namespace:
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          jwt:
+                            properties:
+                              annotationName:
+                                default: eks.amazonaws.com/role-arn
+                                type: string
+                              serviceAccount:
+                                description: A reference to a kuberenetes resource,
+                                  possibly in another namespace
+                                properties:
+                                  name:
+                                    type: string
+                                  namespace:
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              stsAudience:
+                                default: sts.amazonaws.com
+                                type: string
+                            required:
+                            - serviceAccount
+                            type: object
+                          role:
+                            type: string
+                        type: object
                       cachePolicyId:
                         description: The Policy ID of the CloudFront Cache Policy
                           you want to use on distributions. This value is normally
@@ -66,23 +102,6 @@ spec:
                           Policy you want to use on distributions. If you specify
                           this value, cachePolicyId is required.
                         type: string
-                      secretAccessKeySecretRef:
-                        description: The SecretAccessKey is used for authentication.
-                          If not set we fall-back to using env vars, shared credentials
-                          file or AWS Instance metadata https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
-                        properties:
-                          key:
-                            description: The key of the entry in the Secret resource's
-                              `data` field to be used. Some instances of this field
-                              may be defaulted, in others it may be required.
-                            type: string
-                          name:
-                            description: 'Name of the resource being referred to.
-                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
-                            type: string
-                        required:
-                        - name
-                        type: object
                       sslMode:
                         default: sni-only
                         description: Set this true if you need to request a dedicated

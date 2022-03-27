@@ -17,15 +17,25 @@ limitations under the License.
 package cloudfront
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	corev1rest "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "gitlab.com/redcoat/cdn-manager/pkg/api/v1alpha1"
 	"gitlab.com/redcoat/cdn-manager/pkg/resolver"
 )
 
 type CloudFrontProvider struct {
-	Clients map[string]session.Session
+	Auth *AwsAuthProvider
+}
+
+func New(corev1 corev1rest.CoreV1Interface) (*CloudFrontProvider, error) {
+	auth, err := NewAwsAuthProvider("cdn-manager", &corev1)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CloudFrontProvider{
+		Auth: auth,
+	}, nil
 }
 
 func (p CloudFrontProvider) Has(status api.DistributionStatus) bool {
@@ -36,16 +46,6 @@ func (p CloudFrontProvider) Wants(class api.DistributionClassSpec) bool {
 	return class.Providers.CloudFront != nil
 }
 
-func (p CloudFrontProvider) getSession(class api.DistributionClassSpec) *session.Session {
-	config := aws.NewConfig()
-	sessionOpts := session.Options{
-		Config: *config,
-	}
-	sess, _ := session.NewSessionWithOptions(sessionOpts)
-
-	return sess
-}
-
 // Creates a new CloudFront Provider from the given Distribution and
 // calculated ResolvedOrigin
 func (p CloudFrontProvider) Reconcile(
@@ -54,7 +54,7 @@ func (p CloudFrontProvider) Reconcile(
 	cert *resolver.Certificate,
 	status *api.DistributionStatus,
 ) error {
-	sess := p.getSession(class)
+	sess, _ := p.Auth.NewSession(class.Providers.CloudFront.Auth, nil)
 
 	err := NewCertificateProvider(sess, status, cert).Reconcile()
 	if err != nil {
@@ -70,7 +70,7 @@ func (p CloudFrontProvider) Delete(
 	distro api.Distribution,
 	status *api.DistributionStatus,
 ) error {
-	sess := p.getSession(class)
+	sess, _ := p.Auth.NewSession(class.Providers.CloudFront.Auth, nil)
 
 	if status.CloudFront.ID != "" {
 		err := NewDistributionProvider(sess, class, distro, status).Delete()

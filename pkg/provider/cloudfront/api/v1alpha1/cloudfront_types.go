@@ -16,28 +16,15 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
-)
-
 // The access details for cloudfront distributions
 // If this section is provided, a cloudfront distribution will be setup,
 // even if access details are not given in this block.
 // +kubebuilder:object:generate=true
 type CloudFrontSpec struct {
-	// The AccessKeyID is used for authentication.
-	// If not set we fall-back to using env vars, shared credentials file
-	// or AWS Instance metadata
-	// see: https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
-	// +optional
-	AccessKeyID string `json:"accessKeyID,omitempty"`
-
-	// The SecretAccessKey is used for authentication. If not set we
-	// fall-back to using env vars, shared credentials file or AWS
-	// Instance metadata
-	// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials
-	// +optional
-	SecretAccessKey *cmmeta.SecretKeySelector `json:"secretAccessKeySecretRef"`
+	// Details on how to authenticate with the AWS API. If this is not
+	// specified, we will fall back to the ambient credentials given to
+	// the controller pod.
+	Auth *AwsAuth `json:"auth,omitempty"`
 
 	// Set this true if you need to request a dedicated IP address for
 	// your distribution in order to support legacy (non-SNI) clients.
