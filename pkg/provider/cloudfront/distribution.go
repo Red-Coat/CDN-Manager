@@ -181,7 +181,7 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 
 	c.DesiredState = &cloudfront.DistributionConfig{
 		CallerReference: aws.String(string(c.Distribution.UID)),
-		Comment:         aws.String("Managed By cdn.redcoat.dev"),
+		Comment:         aws.String("Managed By CDN-Manager"),
 		Enabled:         aws.Bool(enabled),
 		IsIPV6Enabled:   aws.Bool(true),
 		Origins: &cloudfront.Origins{
