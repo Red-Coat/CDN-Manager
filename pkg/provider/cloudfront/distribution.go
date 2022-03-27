@@ -102,6 +102,7 @@ func (c *DistributionProvider) calculateViewerCertificate() *cloudfront.ViewerCe
 		cert.ACMCertificateArn = arn
 		cert.Certificate = arn
 		cert.
+			SetCloudFrontDefaultCertificate(false).
 			SetCertificateSource("acm").
 			SetMinimumProtocolVersion("TLSv1.2_2021").
 			SetSSLSupportMethod(c.Class.SSLMode)
