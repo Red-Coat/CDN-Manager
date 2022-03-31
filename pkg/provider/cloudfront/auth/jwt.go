@@ -29,6 +29,9 @@ import (
 	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/token,verbs=create
+
 // Generates a set of Credentials, driven by a a web identity created
 // from a ServiceAccount token.
 func (p *AwsAuthProvider) credentialsForJwtAuth(

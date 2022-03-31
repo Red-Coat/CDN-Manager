@@ -26,6 +26,8 @@ import (
 	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get
+
 // Loads static credentials from a secret
 func (p *AwsAuthProvider) credentialsForAccessKey(
 	ctx context.Context,
