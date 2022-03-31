@@ -29,6 +29,8 @@ import (
 	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
+// Generates a set of Credentials, driven by a a web identity created
+// from a ServiceAccount token.
 func (p *AwsAuthProvider) credentialsForJwtAuth(
 	ctx context.Context,
 	details *cfapi.AwsJwtAuth,
@@ -64,12 +66,16 @@ func (p *AwsAuthProvider) credentialsForJwtAuth(
 	)), nil
 }
 
+// Token fetcher is an implementation of stscreds.TokenFetcher. It is
+// used as the callback for the session's JWT token.
 type tokenFetcher struct {
 	api            corev1rest.ServiceAccountInterface
 	serviceAccount string
 	aud            string
 }
 
+// Callback function to load and generate a ServiceAccount token for the
+// session to use.
 func (f tokenFetcher) FetchToken(ctx credentials.Context) ([]byte, error) {
 	tokenResponse, err := f.api.CreateToken(ctx, f.serviceAccount, &authv1.TokenRequest{
 		Spec: authv1.TokenRequestSpec{

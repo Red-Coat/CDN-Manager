@@ -27,6 +27,11 @@ import (
 	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
+// The AwsAuthProvider is used to create a session based on a kubernetes
+// object's config. If the given AwsAuth details specify an access key
+// secret, it is loaded and that is used. If it specified a JWT using a
+// ServiceAccount token, one is generated on the fly. Using ambient
+// credentials is the fallback.
 type AwsAuthProvider struct {
 	session     *session.Session
 	stsApi      *sts.STS
@@ -34,6 +39,8 @@ type AwsAuthProvider struct {
 	corev1      *corev1rest.CoreV1Interface
 }
 
+// Creates an AwsAuthProvider, with the given sessionName and kubernetes
+// client.
 func NewAwsAuthProvider(sessionName string, corev1 *corev1rest.CoreV1Interface) (*AwsAuthProvider, error) {
 	sess, err := newSession()
 	if err != nil {
@@ -48,6 +55,7 @@ func NewAwsAuthProvider(sessionName string, corev1 *corev1rest.CoreV1Interface) 
 	}, nil
 }
 
+// Helper function to setup a session with sensible user agent
 func newSession() (*session.Session, error) {
 	sess, err := session.NewSession()
 	if err != nil {
@@ -57,6 +65,10 @@ func newSession() (*session.Session, error) {
 	return sess, nil
 }
 
+// Creates a new session from the given AwsAuth details. If the details
+// were loaded from a namespace, any referenced Secrets or Service
+// Accountswill be loaded from that same namespace. Otherwise, it will
+// read the namespace from the AwsAuth details.
 func (p *AwsAuthProvider) NewSession(details *cfapi.AwsAuth, namespace *string) (*session.Session, error) {
 	if details == nil {
 		return p.session, nil
