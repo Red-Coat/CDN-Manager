@@ -20,7 +20,7 @@ import (
 	corev1rest "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "gitlab.com/redcoat/cdn-manager/pkg/api/v1alpha1"
-  "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/auth"
+	"gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/auth"
 	"gitlab.com/redcoat/cdn-manager/pkg/resolver"
 )
 

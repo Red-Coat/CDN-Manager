@@ -56,7 +56,8 @@ type ClusterDistributionClass struct {
 	Spec DistributionClassSpec `json:"spec,omitempty"`
 }
 
-// Configuration for the DistributionClass resource
+// Configuration for the DistributionClass or ClusterDistributionClass
+// resource
 type DistributionClassSpec struct {
 	// List of one or more providers to deploy Distributions to. At least
 	// one must be provided

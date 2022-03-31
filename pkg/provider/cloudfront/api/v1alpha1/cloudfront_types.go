@@ -21,9 +21,6 @@ package v1alpha1
 // even if access details are not given in this block.
 // +kubebuilder:object:generate=true
 type CloudFrontSpec struct {
-	// Details on how to authenticate with the AWS API. If this is not
-	// specified, we will fall back to the ambient credentials given to
-	// the controller pod.
 	Auth *AwsAuth `json:"auth,omitempty"`
 
 	// Set this true if you need to request a dedicated IP address for

@@ -45,7 +45,7 @@ func (p *AwsAuthProvider) credentialsForAccessKey(
 	}
 
 	accessKey := string(secret.Data["AWS_ACCESS_KEY_ID"])
-  secretKey := string(secret.Data["AWS_SECRET_ACCESS_KEY"])
+	secretKey := string(secret.Data["AWS_SECRET_ACCESS_KEY"])
 	if accessKey == "" || secretKey == "" {
 		return nil, fmt.Errorf("Secret missing the AWS Key")
 	}

@@ -37,7 +37,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: Configuration for the DistributionClass resource
+            description: Configuration for the DistributionClass or ClusterDistributionClass
+              resource
             properties:
               providers:
                 description: List of one or more providers to deploy Distributions
@@ -57,40 +58,57 @@ spec:
                           credentials given to the controller pod.
                         properties:
                           accessKeySecret:
-                            description: A reference to a kuberenetes resource, possibly
-                              in another namespace
+                            description: 'A reference to a secret containing an AWS
+                              Access ID and Secret Key pair. The Secret must have
+                              data saved in the standard fields: AWS_ACCESS_KEY_ID
+                              and AWS_SECRET_ACCESS_KEY. Other fields are ingored.'
                             properties:
                               name:
+                                description: The name of the resource
                                 type: string
                               namespace:
+                                description: The namespace of the resource. For ClusterDistributionClasses,
+                                  this field is required.
                                 type: string
                             required:
                             - name
                             type: object
                           jwt:
+                            description: Details on how to authenticate using a ServiceAccount
+                              token as a web identity for AWS STS. You should already
+                              have setup the cluster as an identity provider in AWS
+                              IAM.
                             properties:
                               annotationName:
                                 default: eks.amazonaws.com/role-arn
+                                description: The name of the annotation on the ServiceAccount
+                                  to search for the Role to assume. On EKS, the standard
+                                  annotation is the default ("eks.amazonaws.com/role-arn").
                                 type: string
                               serviceAccount:
-                                description: A reference to a kuberenetes resource,
-                                  possibly in another namespace
+                                description: A reference to the ServiceAccount to
+                                  use. A ServiceAccount token will be generated for
+                                  this resource, and used as the web identity.
                                 properties:
                                   name:
+                                    description: The name of the resource
                                     type: string
                                   namespace:
+                                    description: The namespace of the resource. For
+                                      ClusterDistributionClasses, this field is required.
                                     type: string
                                 required:
                                 - name
                                 type: object
                               stsAudience:
                                 default: sts.amazonaws.com
+                                description: The audience to use for the token. It
+                                  is normally save to leave this as the default ("sts.amazonaws.com")
+                                  unless you know you have a different setup.
                                 type: string
                             required:
                             - serviceAccount
                             type: object
-                          role:
-                            type: string
                         type: object
                       cachePolicyId:
                         description: The Policy ID of the CloudFront Cache Policy
@@ -183,7 +201,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: Configuration for the DistributionClass resource
+            description: Configuration for the DistributionClass or ClusterDistributionClass
+              resource
             properties:
               providers:
                 description: List of one or more providers to deploy Distributions
@@ -203,40 +222,57 @@ spec:
                           credentials given to the controller pod.
                         properties:
                           accessKeySecret:
-                            description: A reference to a kuberenetes resource, possibly
-                              in another namespace
+                            description: 'A reference to a secret containing an AWS
+                              Access ID and Secret Key pair. The Secret must have
+                              data saved in the standard fields: AWS_ACCESS_KEY_ID
+                              and AWS_SECRET_ACCESS_KEY. Other fields are ingored.'
                             properties:
                               name:
+                                description: The name of the resource
                                 type: string
                               namespace:
+                                description: The namespace of the resource. For ClusterDistributionClasses,
+                                  this field is required.
                                 type: string
                             required:
                             - name
                             type: object
                           jwt:
+                            description: Details on how to authenticate using a ServiceAccount
+                              token as a web identity for AWS STS. You should already
+                              have setup the cluster as an identity provider in AWS
+                              IAM.
                             properties:
                               annotationName:
                                 default: eks.amazonaws.com/role-arn
+                                description: The name of the annotation on the ServiceAccount
+                                  to search for the Role to assume. On EKS, the standard
+                                  annotation is the default ("eks.amazonaws.com/role-arn").
                                 type: string
                               serviceAccount:
-                                description: A reference to a kuberenetes resource,
-                                  possibly in another namespace
+                                description: A reference to the ServiceAccount to
+                                  use. A ServiceAccount token will be generated for
+                                  this resource, and used as the web identity.
                                 properties:
                                   name:
+                                    description: The name of the resource
                                     type: string
                                   namespace:
+                                    description: The namespace of the resource. For
+                                      ClusterDistributionClasses, this field is required.
                                     type: string
                                 required:
                                 - name
                                 type: object
                               stsAudience:
                                 default: sts.amazonaws.com
+                                description: The audience to use for the token. It
+                                  is normally save to leave this as the default ("sts.amazonaws.com")
+                                  unless you know you have a different setup.
                                 type: string
                             required:
                             - serviceAccount
                             type: object
-                          role:
-                            type: string
                         type: object
                       cachePolicyId:
                         description: The Policy ID of the CloudFront Cache Policy
