@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/sts"
 	corev1rest "k8s.io/client-go/kubernetes/typed/core/v1"
 
@@ -74,17 +75,21 @@ func (p *AwsAuthProvider) NewSession(details *cfapi.AwsAuth, namespace *string) 
 		return p.session, nil
 	}
 
-	if details.JWTAuth != nil {
-		creds, err := p.credentialsForJwtAuth(context.TODO(), details.JWTAuth, namespace)
-		if err != nil {
-			return nil, err
-		}
+  var creds *credentials.Credentials
+  var err error
 
-		config := aws.NewConfig()
-		config.WithCredentials(creds)
+  if details.AccessKey != nil {
+    creds, err = p.credentialsForAccessKey(context.TODO(), details.AccessKey, namespace)
+  } else if details.JWTAuth != nil {
+		creds, err = p.credentialsForJwtAuth(context.TODO(), details.JWTAuth, namespace)
+  }
 
-		return session.NewSession(config)
-	}
+  if err != nil {
+    return nil, err
+  }
 
-	return p.session, nil
+  config := aws.NewConfig()
+  config.WithCredentials(creds)
+
+  return session.NewSession(config)
 }
