@@ -57,7 +57,7 @@ spec:
                           If this is not specified, we will fall back to the ambient
                           credentials given to the controller pod.
                         properties:
-                          accessKeySecret:
+                          accessKeyRef:
                             description: 'A reference to a secret containing an AWS
                               Access ID and Secret Key pair. The Secret must have
                               data saved in the standard fields: AWS_ACCESS_KEY_ID
@@ -221,7 +221,7 @@ spec:
                           If this is not specified, we will fall back to the ambient
                           credentials given to the controller pod.
                         properties:
-                          accessKeySecret:
+                          accessKeyRef:
                             description: 'A reference to a secret containing an AWS
                               Access ID and Secret Key pair. The Secret must have
                               data saved in the standard fields: AWS_ACCESS_KEY_ID

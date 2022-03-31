@@ -78,8 +78,8 @@ func (p *AwsAuthProvider) NewSession(details *cfapi.AwsAuth, namespace *string) 
 	var creds *credentials.Credentials
 	var err error
 
-	if details.AccessKey != nil {
-		creds, err = p.credentialsForAccessKey(context.TODO(), details.AccessKey, namespace)
+	if details.AccessKeyRef != nil {
+		creds, err = p.credentialsForAccessKey(context.TODO(), details.AccessKeyRef, namespace)
 	} else if details.JWTAuth != nil {
 		creds, err = p.credentialsForJwtAuth(context.TODO(), details.JWTAuth, namespace)
 	}

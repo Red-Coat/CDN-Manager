@@ -26,7 +26,7 @@ type AwsAuth struct {
 	// AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Other fields are
 	// ingored.
 	// +optional
-	AccessKey *NamespacedName `json:"accessKeySecret,omitempty"`
+	AccessKeyRef *NamespacedName `json:"accessKeyRef,omitempty"`
 
 	// +optional
 	JWTAuth *AwsJwtAuth `json:"jwt,omitempty"`
