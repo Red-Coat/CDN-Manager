@@ -299,9 +299,11 @@ func (c *DistributionProvider) load() (*string, error) {
 
 	if is, _ := isAwsError(err, "NoSuchDistribution"); is {
 		c.Status.CloudFront.ID = ""
+		c.Status.CloudFront.State = "Unknown"
 		c.removeCloudFrontEndpoints()
 		return nil, nil
 	} else if err != nil {
+		c.Status.CloudFront.State = "Unknown"
 		return nil, err
 	} else {
 		c.CurrentState = res.Distribution
@@ -387,9 +389,9 @@ func (c *DistributionProvider) Create() error {
 		if is, awserr := isAwsError(err, "DistributionAlreadyExists"); is {
 			re := regexp.MustCompile(`[A-Z0-9]{14}`)
 			c.Status.CloudFront.ID = re.FindString(awserr.Message())
-			c.Status.CloudFront.State = "Unknown"
 		}
 
+		c.Status.CloudFront.State = "Unknown"
 		return err
 	}
 

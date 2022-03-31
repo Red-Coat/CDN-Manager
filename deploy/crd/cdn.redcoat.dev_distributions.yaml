@@ -161,8 +161,6 @@ spec:
                     - Unknown
                     type: string
                 required:
-                - certificateArn
-                - id
                 - state
                 type: object
               endpoints:
