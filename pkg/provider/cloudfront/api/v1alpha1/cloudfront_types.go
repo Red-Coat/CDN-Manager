@@ -54,23 +54,3 @@ type CloudFrontSpec struct {
 	// or DELETE, all methods are enabled.
 	SupportedMethods []string `json:"supportedMethods"`
 }
-
-// The status of a CloudFront Distribution, if one was requested by the
-// DistributionClass
-// +kubebuilder:object:generate=true
-type CloudFrontStatus struct {
-	// The CloudFront State as reported by the AWS API. NB: "InProgress"
-	// does not always mean the distribution is not yet available as
-	// sometimes this occurs when minor items are being updated.
-	//+kubebuilder:validation:Enum=Deployed;Disabled;InProgress;Unknown
-	State string `json:"state"`
-
-	// The ID of the CloudFront Distribution (you can use this in any
-	// interaction with the aws cloudfront api).
-	// +optional
-	ID string `json:"id"`
-
-	// The ARN of the ACM Certificate created for the distribution
-	// +optional
-	CertificateArn string `json:"certificateArn"`
-}

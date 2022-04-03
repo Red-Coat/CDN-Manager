@@ -18,8 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	cfapi "gitlab.com/redcoat/cdn-manager/pkg/provider/cloudfront/api/v1alpha1"
 )
 
 func init() {
@@ -127,10 +125,18 @@ type DistributionStatus struct {
 	//+optional
 	Endpoints []Endpoint `json:"endpoints"`
 
-	// Information about the state of the CloudFront distribution and
-	// associated resources.
-	//+optional
-	CloudFront cfapi.CloudFrontStatus `json:"cloudfront,omitempty"`
+	// The external provider's Identifier for the distribution
+	// +optional
+	ExternalId string `json:"externalId"`
+
+	// If a TLS certificate is associated with the distribution, this is
+	// its identifier in the external provider
+	// +optional
+	ExternalCertificateId string `json:"externalCertificateId"`
+
+	// A status message from the external provider
+	// +optional
+	ExternalStatus string `json:"externalStatus,omitempty"`
 }
 
 // Information about a specific Endpoint
@@ -152,10 +158,6 @@ type DistributionStatus struct {
 // - ip: 1.2.3.4
 // - host: lb-4-5-6-7.provider.example.com
 type Endpoint struct {
-	// The name of the provider that is responsible for this endpoint
-	// (eg "cloudfront").
-	Provider string `json:"provider"`
-
 	// A hostname that the distribution is available at. This is what you
 	// would use in an DNS CNAME record. At least one of "Host" and "IP"
 	// must be set for each Endpoint.

@@ -41,8 +41,6 @@ spec:
               resource
             properties:
               providers:
-                description: List of one or more providers to deploy Distributions
-                  to. At least one must be provided
                 properties:
                   cloudfront:
                     description: If this block exists, Distributions referencing this

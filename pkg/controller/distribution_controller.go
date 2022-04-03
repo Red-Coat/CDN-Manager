@@ -171,17 +171,17 @@ func (r *DistributionReconciler) reconcileProviders(
 	var result ctrl.Result
 
 	for _, provider := range r.Providers {
-		if !provider.Wants(class) {
-			continue
-		}
+		if provider.Wants(class) {
+			err := provider.Reconcile(class, distro, cert, newStatus)
 
-		err := provider.Reconcile(class, distro, cert, newStatus)
+			if err != nil {
+				// In the event of an error we'll requeue immediately
+				result.Requeue = true
+				newStatus.Ready = false
+				r.log.Error(err, "Unable to run provider")
+			}
 
-		if err != nil {
-			// In the event of an error we'll requeue immediately
-			result.Requeue = true
-			newStatus.Ready = false
-			r.log.Error(err, "Unable to run provider")
+			break
 		}
 	}
 
@@ -208,7 +208,7 @@ func (r *DistributionReconciler) deleteProviders(
 	allDeleted := true
 
 	for _, provider := range r.Providers {
-		if !provider.Has(distro.Status) {
+		if !provider.Wants(class) {
 			continue
 		}
 
@@ -219,7 +219,7 @@ func (r *DistributionReconciler) deleteProviders(
 			log.Info("Error", "error", err)
 		}
 
-		allDeleted = allDeleted && !provider.Has(*newStatus)
+		allDeleted = newStatus.ExternalId == "" && newStatus.ExternalCertificateId == ""
 	}
 
 	r.requeueIfNotReady(&result, allDeleted)

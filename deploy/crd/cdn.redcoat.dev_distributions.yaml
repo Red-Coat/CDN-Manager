@@ -138,31 +138,6 @@ spec:
           status:
             description: The current State of the Distribution
             properties:
-              cloudfront:
-                description: Information about the state of the CloudFront distribution
-                  and associated resources.
-                properties:
-                  certificateArn:
-                    description: The ARN of the ACM Certificate created for the distribution
-                    type: string
-                  id:
-                    description: The ID of the CloudFront Distribution (you can use
-                      this in any interaction with the aws cloudfront api).
-                    type: string
-                  state:
-                    description: 'The CloudFront State as reported by the AWS API.
-                      NB: "InProgress" does not always mean the distribution is not
-                      yet available as sometimes this occurs when minor items are
-                      being updated.'
-                    enum:
-                    - Deployed
-                    - Disabled
-                    - InProgress
-                    - Unknown
-                    type: string
-                required:
-                - state
-                type: object
               endpoints:
                 description: List of one or more "endpoints" for the deployed distribution.
                   These can be either hostnames for DNS CNAMING, or direct IP addresses,
@@ -188,14 +163,18 @@ spec:
                         at. This is what you would use in a DNS A or AAAA record.
                         At least one of "Host" and "IP" must be set for each Endpoint.
                       type: string
-                    provider:
-                      description: The name of the provider that is responsible for
-                        this endpoint (eg "cloudfront").
-                      type: string
-                  required:
-                  - provider
                   type: object
                 type: array
+              externalCertificateId:
+                description: If a TLS certificate is associated with the distribution,
+                  this is its identifier in the external provider
+                type: string
+              externalId:
+                description: The external provider's Identifier for the distribution
+                type: string
+              externalStatus:
+                description: A status message from the external provider
+                type: string
               ready:
                 type: boolean
             required:

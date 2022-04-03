@@ -59,8 +59,6 @@ type ClusterDistributionClass struct {
 // Configuration for the DistributionClass or ClusterDistributionClass
 // resource
 type DistributionClassSpec struct {
-	// List of one or more providers to deploy Distributions to. At least
-	// one must be provided
 	Providers ProviderList `json:"providers"`
 }
 

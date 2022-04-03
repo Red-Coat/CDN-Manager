@@ -30,13 +30,6 @@ type CDNProvider interface {
 	//   spec.Providers.[ProviderName] != nil
 	Wants(api.DistributionClassSpec) bool
 
-	// Checks if the given DistributionStatus already has a status for
-	// this provider
-	//
-	// Normally this would be a simple check:
-	//   status.[ProviderName] != nil
-	Has(api.DistributionStatus) bool
-
 	// Creates a specific DistributionProvider for the given Distribution,
 	// ResolvedOrigin, and DistribitionClassSpec
 	//

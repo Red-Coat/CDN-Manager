@@ -39,10 +39,6 @@ func New(corev1 corev1rest.CoreV1Interface) (*CloudFrontProvider, error) {
 	}, nil
 }
 
-func (p CloudFrontProvider) Has(status api.DistributionStatus) bool {
-	return status.CloudFront.ID != "" || status.CloudFront.CertificateArn != ""
-}
-
 func (p CloudFrontProvider) Wants(class api.DistributionClassSpec) bool {
 	return class.Providers.CloudFront != nil
 }
@@ -73,7 +69,7 @@ func (p CloudFrontProvider) Delete(
 ) error {
 	sess, _ := p.Auth.NewSession(class.Providers.CloudFront.Auth, nil)
 
-	if status.CloudFront.ID != "" {
+	if status.ExternalId != "" {
 		err := NewDistributionProvider(sess, class, distro, status).Delete()
 		if err != nil {
 			return err
@@ -82,7 +78,7 @@ func (p CloudFrontProvider) Delete(
 
 	// If the CloudFront distro has not been deleted yet, we can't attempt
 	// to delete the certificate
-	if status.CloudFront.ID != "" {
+	if status.ExternalId != "" {
 		return nil
 	}
 

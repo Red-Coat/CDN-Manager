@@ -97,8 +97,8 @@ func (c *DistributionProvider) calculateViewerPolicy() string {
 
 func (c *DistributionProvider) calculateViewerCertificate() *cloudfront.ViewerCertificate {
 	var cert cloudfront.ViewerCertificate
-	if c.Status.CloudFront.CertificateArn != "" {
-		arn := aws.String(c.Status.CloudFront.CertificateArn)
+	if c.Status.ExternalCertificateId != "" {
+		arn := aws.String(c.Status.ExternalCertificateId)
 		cert.ACMCertificateArn = arn
 		cert.Certificate = arn
 		cert.
@@ -270,14 +270,12 @@ func (c *DistributionProvider) generateDistributionConfig(enabled bool) {
 // Sets the Status based on the Status returned by the AWS API
 func (c *DistributionProvider) setStatus() {
 	state := c.CurrentState
-	c.Status.CloudFront.State = *state.Status
-	c.Status.CloudFront.ID = *state.Id
-	c.removeCloudFrontEndpoints()
-	c.Status.Endpoints = append(c.Status.Endpoints, api.Endpoint{
-		Provider: "cloudfront",
-		Host:     *state.DomainName,
-	})
-	c.Status.Ready = c.Status.Ready && *state.Status == "Deployed"
+	c.Status.ExternalStatus = *state.Status
+	c.Status.ExternalId = *state.Id
+	c.Status.Endpoints = []api.Endpoint{api.Endpoint{
+		Host: *state.DomainName,
+	}}
+	c.Status.Ready = *state.Status == "Deployed"
 }
 
 func isAwsError(err error, code string) (bool, awserr.Error) {
@@ -294,16 +292,16 @@ func isAwsError(err error, code string) (bool, awserr.Error) {
 
 func (c *DistributionProvider) load() (*string, error) {
 	res, err := c.Client.GetDistribution(&cloudfront.GetDistributionInput{
-		Id: &c.Distribution.Status.CloudFront.ID,
+		Id: &c.Distribution.Status.ExternalId,
 	})
 
 	if is, _ := isAwsError(err, "NoSuchDistribution"); is {
-		c.Status.CloudFront.ID = ""
-		c.Status.CloudFront.State = "Unknown"
-		c.removeCloudFrontEndpoints()
+		c.Status.ExternalId = ""
+		c.Status.ExternalStatus = "Unknown"
+		c.Status.Endpoints = []api.Endpoint{}
 		return nil, nil
 	} else if err != nil {
-		c.Status.CloudFront.State = "Unknown"
+		c.Status.ExternalStatus = "Unknown"
 		return nil, err
 	} else {
 		c.CurrentState = res.Distribution
@@ -329,7 +327,7 @@ func (c *DistributionProvider) update(etag *string) (*string, error) {
 }
 
 func (c *DistributionProvider) Reconcile() error {
-	if c.Distribution.Status.CloudFront.ID != "" {
+	if c.Distribution.Status.ExternalId != "" {
 		return c.Check()
 	} else {
 		return c.Create()
@@ -388,10 +386,10 @@ func (c *DistributionProvider) Create() error {
 		// occur.
 		if is, awserr := isAwsError(err, "DistributionAlreadyExists"); is {
 			re := regexp.MustCompile(`[A-Z0-9]{14}`)
-			c.Status.CloudFront.ID = re.FindString(awserr.Message())
+			c.Status.ExternalId = re.FindString(awserr.Message())
 		}
 
-		c.Status.CloudFront.State = "Unknown"
+		c.Status.ExternalStatus = "Unknown"
 		return err
 	}
 
@@ -399,17 +397,6 @@ func (c *DistributionProvider) Create() error {
 	c.setStatus()
 
 	return nil
-}
-
-func (c *DistributionProvider) removeCloudFrontEndpoints() {
-	var endpoints []api.Endpoint
-	for _, endpoint := range c.Status.Endpoints {
-		if endpoint.Provider != "cloudfront" {
-			endpoints = append(endpoints, endpoint)
-		}
-	}
-
-	c.Status.Endpoints = endpoints
 }
 
 func (c *DistributionProvider) Delete() error {
@@ -445,8 +432,8 @@ func (c *DistributionProvider) Delete() error {
 	if err != nil {
 		return err
 	} else {
-		c.Status.CloudFront.ID = ""
-		c.removeCloudFrontEndpoints()
+		c.Status.ExternalId = ""
+		c.Status.Endpoints = []api.Endpoint{}
 
 		return nil
 	}

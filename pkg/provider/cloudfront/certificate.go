@@ -52,7 +52,7 @@ func NewCertificateProvider(
 }
 
 func (c *CertificateProvider) Reconcile() error {
-	if c.Status.CloudFront.CertificateArn != "" {
+	if c.Status.ExternalCertificateId != "" {
 		return c.Check()
 	} else {
 		return c.Create()
@@ -71,11 +71,11 @@ func (c *CertificateProvider) getSerial() string {
 
 func (c *CertificateProvider) Check() error {
 	info, err := c.Client.DescribeCertificate(&acm.DescribeCertificateInput{
-		CertificateArn: aws.String(c.Status.CloudFront.CertificateArn),
+		CertificateArn: aws.String(c.Status.ExternalCertificateId),
 	})
 
 	if is, _ := isAwsError(err, "ResourceNotFoundException"); is {
-		c.Status.CloudFront.CertificateArn = ""
+		c.Status.ExternalCertificateId = ""
 		return c.Create()
 	} else if err != nil {
 		return err
@@ -90,8 +90,8 @@ func (c *CertificateProvider) Check() error {
 
 func (c *CertificateProvider) Create() error {
 	var arn *string
-	if c.Status.CloudFront.CertificateArn != "" {
-		arn = aws.String(c.Status.CloudFront.CertificateArn)
+	if c.Status.ExternalCertificateId != "" {
+		arn = aws.String(c.Status.ExternalCertificateId)
 	}
 
 	info, err := c.Client.ImportCertificate(&acm.ImportCertificateInput{
@@ -105,22 +105,22 @@ func (c *CertificateProvider) Create() error {
 		return err
 	}
 
-	c.Status.CloudFront.CertificateArn = *info.CertificateArn
+	c.Status.ExternalCertificateId = *info.CertificateArn
 	return nil
 }
 
 func (c *CertificateProvider) Delete() error {
 	_, err := c.Client.DeleteCertificate(&acm.DeleteCertificateInput{
-		CertificateArn: aws.String(c.Status.CloudFront.CertificateArn),
+		CertificateArn: aws.String(c.Status.ExternalCertificateId),
 	})
 
 	if is, _ := isAwsError(err, "ResourceNotFoundException"); is {
-		c.Status.CloudFront.CertificateArn = ""
+		c.Status.ExternalCertificateId = ""
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	c.Status.CloudFront.CertificateArn = ""
+	c.Status.ExternalCertificateId = ""
 	return nil
 }
