@@ -30,6 +30,10 @@ type AwsAuth struct {
 
 	// +optional
 	JWTAuth *AwsJwtAuth `json:"jwt,omitempty"`
+
+	// An optional Role ARN to assume
+	// +optional
+	Role string `json:"roleArn,omitempty"`
 }
 
 // Details on how to authenticate using a ServiceAccount token as a

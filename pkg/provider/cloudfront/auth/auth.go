@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	corev1rest "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -91,5 +92,21 @@ func (p *AwsAuthProvider) NewSession(details *cfapi.AwsAuth, namespace *string) 
 	config := aws.NewConfig()
 	config.WithCredentials(creds)
 
-	return session.NewSession(config)
+	sess, err := session.NewSession(config)
+	if err != nil {
+		return nil, err
+	}
+
+	// When a role is given, we wrap the final created session in an
+	// AssumeRoleProvider
+	if details.Role != "" {
+		sess, err = session.NewSession(&aws.Config{
+			Credentials: stscreds.NewCredentials(sess, details.Role),
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return sess, nil
 }
