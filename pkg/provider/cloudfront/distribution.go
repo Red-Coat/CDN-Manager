@@ -121,8 +121,8 @@ func (c *DistributionProvider) calculateAliases() *cloudfront.Aliases {
 	aliases := cloudfront.Aliases{
 		Quantity: aws.Int64(int64(len(c.Distribution.Spec.Hosts))),
 	}
-  // Hostnames must be sorted for comparison between desired and current
-  // state.
+	// Hostnames must be sorted for comparison between desired and current
+	// state.
 	sort.Strings(c.Distribution.Spec.Hosts)
 	if *aliases.Quantity > 0 {
 		aliases.Items = aws.StringSlice(c.Distribution.Spec.Hosts)
