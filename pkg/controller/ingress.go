@@ -73,11 +73,8 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log = log.WithValues("class", class)
 	log.Info("Starting Reconciliation")
 
-	var distros api.DistributionList
-	r.List(ctx, &distros,
-		client.InNamespace(req.Namespace),
-		client.MatchingLabels(ingress.GetLabels()),
-	)
+	var distro api.Distribution
+	err := r.Get(ctx, req.NamespacedName, &distro)
 
 	desired := r.getDesiredDistribution(ingress, *class)
 	if desired.Spec.Origin.Host == "" {
@@ -85,26 +82,23 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	if len(distros.Items) == 0 {
+	if err != nil {
 		resolver.AddDistributionMeta(&ingress, &desired)
 
 		err := r.Create(ctx, &desired)
 		if err != nil {
 			log.V(-3).Error(err, "Couldn't create distribution")
 		}
-	} else if len(distros.Items) == 1 {
-		distro := distros.Items[0]
+	} else {
 		if !reflect.DeepEqual(desired.Spec, distro.Spec) {
 			log.V(1).Info("Distribution is out of sync!")
 
-			distros.Items[0].Spec = desired.Spec
-			err := r.Update(ctx, &distros.Items[0])
+			distro.Spec = desired.Spec
+			err := r.Update(ctx, &distro)
 			if err != nil {
 				log.V(-3).Error(err, "Couldn't update distribution")
 			}
 		}
-	} else {
-		log.V(-3).Info("Unexpected number of distributions matching ingress")
 	}
 
 	return ctrl.Result{}, nil
