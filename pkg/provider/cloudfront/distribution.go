@@ -353,6 +353,21 @@ func (c *DistributionProvider) Check() error {
 
 	c.generateDistributionConfig(true)
 
+	// We do a DeepEqual comparison to check if the Current State is the
+	// same as the Desired State (and if it is not, this will trigger an
+	// update). When we have multiple hostnames it is important that these
+	// appear in the same order  for the comparison to work.
+	// We always send a sorted list of hostnames, however it looks like
+	// CloudFront returns the list in the order that they were added, so
+	// we need to modify its response and sort them ourselves prior to the
+	// comparison.
+	hosts := make([]string, *c.CurrentState.DistributionConfig.Aliases.Quantity)
+	for idx, element := range c.CurrentState.DistributionConfig.Aliases.Items {
+		hosts[idx] = *element
+	}
+	sort.Strings(hosts)
+	c.CurrentState.DistributionConfig.Aliases.Items = aws.StringSlice(hosts)
+
 	// If nothing has changed, we do not need to request an update
 	if reflect.DeepEqual(c.DesiredState, c.CurrentState.DistributionConfig) {
 		return nil
