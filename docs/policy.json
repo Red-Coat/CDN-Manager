@@ -1,0 +1,26 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ManageCertificates",
+            "Effect": "Allow",
+            "Action": [
+                "acm:DeleteCertificate",
+                "acm:DescribeCertificate",
+                "acm:ImportCertificate"
+            ],
+            "Resource": "arn:aws:acm:us-east-1:*:certificate/*"
+        },
+        {
+            "Sid": "ManageCloudFront",
+            "Effect": "Allow",
+            "Action": [
+                "cloudfront:GetDistribution",
+                "cloudfront:UpdateDistribution",
+                "cloudfront:CreateDistribution",
+                "cloudfront:DeleteDistribution"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
